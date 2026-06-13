@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import type { HouseholdBootstrap } from "../server/household-service";
+import { SecurityPanel } from "./SecurityPanel";
 
 type DashboardShellProps = HouseholdBootstrap & {
   onLogout?: () => void | Promise<void>;
@@ -77,6 +78,8 @@ export function DashboardShell({
         </header>
 
         <div className="dashboard-grid">
+          <SecurityPanel />
+
           <section className="panel span-4">
             <div className="panel-header">
               <div className="panel-title">

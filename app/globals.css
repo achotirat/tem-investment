@@ -285,6 +285,12 @@ button:disabled {
   font-weight: 800;
 }
 
+.pill.secure {
+  border-color: rgba(14, 111, 79, 0.26);
+  background: var(--green-soft);
+  color: var(--green);
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(12, 1fr);
@@ -423,6 +429,84 @@ button:disabled {
   font-weight: 900;
 }
 
+.security-panel {
+  border-color: rgba(14, 111, 79, 0.28);
+}
+
+.security-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+}
+
+.security-column {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  min-width: 0;
+}
+
+.security-copy {
+  margin: 6px 0 0;
+  color: var(--muted-ink);
+  line-height: 1.45;
+}
+
+.unlock-form {
+  display: grid;
+  gap: 12px;
+}
+
+.unlock-state {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  padding: 14px;
+}
+
+.unlock-state strong,
+.unlock-state span {
+  display: block;
+}
+
+.unlock-state span {
+  color: var(--muted-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.recovery-key-box {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  padding: 14px;
+}
+
+.recovery-key-box code {
+  display: block;
+  overflow-wrap: anywhere;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  padding: 12px;
+  font-family: Menlo, Consolas, monospace;
+  font-weight: 900;
+}
+
+.checkbox-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted-ink);
+  font-weight: 800;
+}
+
 .loading-screen {
   display: grid;
   min-height: 100vh;
@@ -461,5 +545,9 @@ button:disabled {
   .span-8,
   .span-12 {
     grid-column: 1 / -1;
+  }
+
+  .security-grid {
+    grid-template-columns: 1fr;
   }
 }
