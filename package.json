@@ -16,6 +16,7 @@
     "@netlify/functions": "latest",
     "@netlify/identity": "latest",
     "@netlify/plugin-nextjs": "latest",
+    "@noble/hashes": "^2.2.0",
     "lucide-react": "latest",
     "next": "latest",
     "react": "latest",
