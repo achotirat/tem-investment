@@ -1,0 +1,51 @@
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+
+import { DashboardShell } from "../src/client/DashboardShell";
+import { LoginPanel } from "../src/client/LoginPanel";
+
+describe("LoginPanel", () => {
+  it("asks unauthenticated users to log in with Netlify Identity", () => {
+    render(<LoginPanel error={null} loading={false} onSubmit={vi.fn()} />);
+
+    expect(screen.getByRole("heading", { name: "Household login" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Log in" })).toBeEnabled();
+  });
+});
+
+describe("DashboardShell", () => {
+  it("shows an empty household command center after login", () => {
+    render(
+      <DashboardShell
+        household={{
+          id: "household_1",
+          name: "Tem Household",
+          baseCurrency: "THB",
+          secondaryCurrency: "USD",
+        }}
+        member={{
+          identityUserId: "user_123",
+          email: "tem@example.com",
+          role: "owner",
+        }}
+        ownerEntities={[
+          {
+            id: "owner_1",
+            displayName: "Tem",
+            kind: "person",
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Portfolio Command Center" })).toBeInTheDocument();
+    expect(screen.getByText("Tem Household")).toBeInTheDocument();
+    expect(screen.getByText("THB 0")).toBeInTheDocument();
+    expect(screen.getByText("USD 0")).toBeInTheDocument();
+    expect(screen.getByText("P1 Store of Wealth")).toBeInTheDocument();
+    expect(screen.getByText("60% target")).toBeInTheDocument();
+    expect(screen.getByText("No holdings recorded yet")).toBeInTheDocument();
+  });
+});
