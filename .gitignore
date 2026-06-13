@@ -1,2 +1,13 @@
-.superpowers/
-
+.DS_Store
+.env
+.env.*
+!.env.example
+.netlify
+.playwright-mcp
+.superpowers
+.next
+node_modules
+coverage
+dist
+deno.lock
+npm-debug.log*
