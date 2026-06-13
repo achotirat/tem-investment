@@ -6,6 +6,9 @@ import {
   secureRandomBytes,
   utf8ToBytes,
 } from "./encoding";
+import type { EncryptedField } from "../../shared/encryption";
+
+export type { EncryptedField } from "../../shared/encryption";
 
 export type KeyDerivationMethod = "argon2id" | "pbkdf2";
 
@@ -20,13 +23,6 @@ export type Argon2idDeriver =
 export type DerivedMasterKey = {
   key: CryptoKey;
   method: KeyDerivationMethod;
-};
-
-export type EncryptedField = {
-  version: 1;
-  algorithm: "AES-GCM";
-  iv: string;
-  ciphertext: string;
 };
 
 type DeriveMasterKeyInput = {

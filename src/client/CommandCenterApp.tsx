@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getUser, handleAuthCallback, login, logout, onAuthChange } from "@netlify/identity";
 
 import type { HouseholdBootstrap } from "../server/household-service";
+import type { AddHoldingInput, HoldingSummary } from "../shared/holdings";
 import { DashboardShell } from "./DashboardShell";
 import { LoginPanel } from "./LoginPanel";
 
@@ -28,6 +29,7 @@ export function CommandCenterApp() {
   });
   const [bootstrap, setBootstrap] = useState<HouseholdBootstrap | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const [holdings, setHoldings] = useState<HoldingSummary[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -73,6 +75,7 @@ export function CommandCenterApp() {
   useEffect(() => {
     if (!auth.user) {
       setBootstrap(null);
+      setHoldings([]);
       return;
     }
 
@@ -99,6 +102,34 @@ export function CommandCenterApp() {
     };
   }, [auth.user]);
 
+  useEffect(() => {
+    if (!bootstrap) {
+      setHoldings([]);
+      return;
+    }
+
+    let active = true;
+
+    async function loadHoldings() {
+      try {
+        const response = await fetch("/api/holdings");
+        if (!response.ok) {
+          throw new Error(`Holdings load failed with ${response.status}`);
+        }
+        const payload = (await response.json()) as { holdings: HoldingSummary[] };
+        if (active) setHoldings(payload.holdings);
+      } catch (error) {
+        if (active) setBootstrapError(messageForError(error));
+      }
+    }
+
+    void loadHoldings();
+
+    return () => {
+      active = false;
+    };
+  }, [bootstrap]);
+
   async function handleLogin(credentials: { email: string; password: string }) {
     setAuth((current) => ({ ...current, loggingIn: true, error: null }));
     try {
@@ -122,6 +153,25 @@ export function CommandCenterApp() {
     await logout();
     setAuth((current) => ({ ...current, user: null }));
     setBootstrap(null);
+    setHoldings([]);
+  }
+
+  async function handleCreateHolding(input: AddHoldingInput): Promise<HoldingSummary> {
+    const response = await fetch("/api/holdings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Holding save failed with ${response.status}`);
+    }
+
+    const created = (await response.json()) as HoldingSummary;
+    setHoldings((current) => [created, ...current]);
+    return created;
   }
 
   if (auth.loading) {
@@ -140,7 +190,14 @@ export function CommandCenterApp() {
     return <div className="loading-screen">Preparing household</div>;
   }
 
-  return <DashboardShell {...bootstrap} onLogout={handleLogout} />;
+  return (
+    <DashboardShell
+      {...bootstrap}
+      holdings={holdings}
+      onCreateHolding={handleCreateHolding}
+      onLogout={handleLogout}
+    />
+  );
 }
 
 function messageForError(error: unknown): string {
