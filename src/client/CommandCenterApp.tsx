@@ -9,6 +9,11 @@ import type { AddHoldingInput, HoldingSummary } from "../shared/holdings";
 import type { PriceDashboardPayload } from "../shared/pricing";
 import { DashboardShell } from "./DashboardShell";
 import { LoginPanel } from "./LoginPanel";
+import {
+  DEMO_IDENTITY_USER,
+  createDemoWorkspace,
+  unlockDemoWorkspace,
+} from "./demo-workspace";
 
 type AppIdentityUser = {
   id?: string;
@@ -31,6 +36,7 @@ export function CommandCenterApp() {
   });
   const [bootstrap, setBootstrap] = useState<HouseholdBootstrap | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const [demoMode, setDemoMode] = useState(false);
   const [holdings, setHoldings] = useState<HoldingSummary[]>([]);
   const [decisions, setDecisions] = useState<DecisionLogSummary[]>([]);
   const [priceDashboard, setPriceDashboard] = useState<PriceDashboardPayload>({
@@ -90,6 +96,8 @@ export function CommandCenterApp() {
       return;
     }
 
+    if (demoMode) return;
+
     let active = true;
 
     async function loadHousehold() {
@@ -111,7 +119,7 @@ export function CommandCenterApp() {
     return () => {
       active = false;
     };
-  }, [auth.user]);
+  }, [auth.user, demoMode]);
 
   useEffect(() => {
     if (!bootstrap) {
@@ -120,6 +128,8 @@ export function CommandCenterApp() {
       setPriceDashboard({ prices: [], staleWarnings: [], lastSync: null });
       return;
     }
+
+    if (demoMode) return;
 
     let active = true;
 
@@ -159,9 +169,10 @@ export function CommandCenterApp() {
     return () => {
       active = false;
     };
-  }, [bootstrap]);
+  }, [bootstrap, demoMode]);
 
   async function handleLogin(credentials: { email: string; password: string }) {
+    setDemoMode(false);
     setAuth((current) => ({ ...current, loggingIn: true, error: null }));
     try {
       const currentUser = (await login(credentials.email, credentials.password)) as AppIdentityUser;
@@ -180,8 +191,33 @@ export function CommandCenterApp() {
     }
   }
 
+  async function handleDemoLogin() {
+    setAuth((current) => ({ ...current, loggingIn: true, error: null }));
+    try {
+      const demoWorkspace = await createDemoWorkspace();
+      setDemoMode(true);
+      setBootstrap(demoWorkspace.bootstrap);
+      setHoldings(demoWorkspace.holdings);
+      setDecisions(demoWorkspace.decisions);
+      setPriceDashboard(demoWorkspace.priceDashboard);
+      setAuth({
+        loading: false,
+        loggingIn: false,
+        user: DEMO_IDENTITY_USER,
+        error: null,
+      });
+    } catch (error) {
+      setAuth((current) => ({
+        ...current,
+        loggingIn: false,
+        error: messageForError(error),
+      }));
+    }
+  }
+
   async function handleLogout() {
-    await logout();
+    if (!demoMode) await logout();
+    setDemoMode(false);
     setAuth((current) => ({ ...current, user: null }));
     setBootstrap(null);
     setHoldings([]);
@@ -244,7 +280,14 @@ export function CommandCenterApp() {
   }
 
   if (!auth.user) {
-    return <LoginPanel error={auth.error} loading={auth.loggingIn} onSubmit={handleLogin} />;
+    return (
+      <LoginPanel
+        error={auth.error}
+        loading={auth.loggingIn}
+        onDemoLogin={handleDemoLogin}
+        onSubmit={handleLogin}
+      />
+    );
   }
 
   if (bootstrapError) {
@@ -261,10 +304,11 @@ export function CommandCenterApp() {
       decisions={decisions}
       holdings={holdings}
       lastPriceSync={priceDashboard.lastSync}
-      onCreateDecision={handleCreateDecision}
-      onCreateHolding={handleCreateHolding}
-      onRefreshPrices={handleRefreshPrices}
+      onCreateDecision={demoMode ? undefined : handleCreateDecision}
+      onCreateHolding={demoMode ? undefined : handleCreateHolding}
+      onRefreshPrices={demoMode ? undefined : handleRefreshPrices}
       onLogout={handleLogout}
+      onUnlock={demoMode ? unlockDemoWorkspace : undefined}
       prices={priceDashboard.prices}
       refreshingPrices={refreshingPrices}
       staleWarnings={priceDashboard.staleWarnings}

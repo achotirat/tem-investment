@@ -6,10 +6,11 @@ import { KeyRound, LogIn } from "lucide-react";
 type LoginPanelProps = {
   error: string | null;
   loading: boolean;
+  onDemoLogin?: () => void | Promise<void>;
   onSubmit: (credentials: { email: string; password: string }) => void | Promise<void>;
 };
 
-export function LoginPanel({ error, loading, onSubmit }: LoginPanelProps) {
+export function LoginPanel({ error, loading, onDemoLogin, onSubmit }: LoginPanelProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -57,6 +58,12 @@ export function LoginPanel({ error, loading, onSubmit }: LoginPanelProps) {
             <LogIn aria-hidden="true" size={18} />
             {loading ? "Logging in" : "Log in"}
           </button>
+          {onDemoLogin ? (
+            <button className="secondary-button" disabled={loading} onClick={onDemoLogin} type="button">
+              <KeyRound aria-hidden="true" size={18} />
+              Use demo
+            </button>
+          ) : null}
         </form>
       </section>
       <section className="login-visual" aria-label="Target allocation preview">

@@ -23,6 +23,7 @@ import type {
   ValuationFreshnessWarning,
 } from "../shared/pricing";
 import { SecurityPanel } from "./SecurityPanel";
+import type { DerivedMasterKey } from "./crypto/portfolio-crypto";
 import { DecisionLogPanel } from "./decisions/DecisionLogPanel";
 import { LogHoldingDecisionPanel } from "./decisions/LogHoldingDecisionPanel";
 import { AddHoldingPanel } from "./holdings/AddHoldingPanel";
@@ -40,6 +41,7 @@ type DashboardShellProps = HouseholdBootstrap & {
   staleWarnings?: ValuationFreshnessWarning[];
   lastPriceSync?: PriceSyncSummary | null;
   refreshingPrices?: boolean;
+  onUnlock?: (masterPassword: string) => Promise<DerivedMasterKey>;
   onRefreshPrices?: () => Promise<void> | void;
 };
 
@@ -62,6 +64,7 @@ export function DashboardShell({
   staleWarnings = [],
   lastPriceSync = null,
   refreshingPrices = false,
+  onUnlock,
   onRefreshPrices = async () => {},
 }: DashboardShellProps) {
   const [sessionKey, setSessionKey] = useState<CryptoKey | null>(null);
@@ -181,7 +184,10 @@ export function DashboardShell({
         </header>
 
         <div className="dashboard-grid">
-          <SecurityPanel onSessionChange={(session) => setSessionKey(session?.key ?? null)} />
+          <SecurityPanel
+            onSessionChange={(session) => setSessionKey(session?.key ?? null)}
+            onUnlock={onUnlock}
+          />
 
           <section className="panel span-4">
             <div className="panel-header">
