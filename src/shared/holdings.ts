@@ -64,4 +64,8 @@ export type HoldingSummary = {
   valuationDate: string;
   status: HoldingStatus;
   ownershipSplits: OwnershipSplitInput[];
+  encryptedValues: EncryptedHoldingValues;
+  autoPriceKey: string | null;
+  latestMarketPriceThb: number | null;
+  latestMarketPriceAsOf: string | null;
 };

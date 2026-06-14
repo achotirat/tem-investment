@@ -612,6 +612,36 @@ button:disabled {
   font-weight: 800;
 }
 
+.price-refresh,
+.stale-list {
+  display: grid;
+  gap: 12px;
+}
+
+.price-sync-state,
+.stale-row {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 10px 12px;
+}
+
+.price-sync-state span,
+.stale-row strong {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.price-sync-state small,
+.stale-row small {
+  color: var(--muted-ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .checkbox-line {
   display: flex;
   align-items: center;

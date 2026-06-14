@@ -6,6 +6,7 @@ import { getUser, handleAuthCallback, login, logout, onAuthChange } from "@netli
 import type { HouseholdBootstrap } from "../server/household-service";
 import type { DecisionLogInput, DecisionLogSummary } from "../shared/discipline";
 import type { AddHoldingInput, HoldingSummary } from "../shared/holdings";
+import type { PriceDashboardPayload } from "../shared/pricing";
 import { DashboardShell } from "./DashboardShell";
 import { LoginPanel } from "./LoginPanel";
 
@@ -32,6 +33,12 @@ export function CommandCenterApp() {
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [holdings, setHoldings] = useState<HoldingSummary[]>([]);
   const [decisions, setDecisions] = useState<DecisionLogSummary[]>([]);
+  const [priceDashboard, setPriceDashboard] = useState<PriceDashboardPayload>({
+    prices: [],
+    staleWarnings: [],
+    lastSync: null,
+  });
+  const [refreshingPrices, setRefreshingPrices] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -79,6 +86,7 @@ export function CommandCenterApp() {
       setBootstrap(null);
       setHoldings([]);
       setDecisions([]);
+      setPriceDashboard({ prices: [], staleWarnings: [], lastSync: null });
       return;
     }
 
@@ -109,6 +117,7 @@ export function CommandCenterApp() {
     if (!bootstrap) {
       setHoldings([]);
       setDecisions([]);
+      setPriceDashboard({ prices: [], staleWarnings: [], lastSync: null });
       return;
     }
 
@@ -116,9 +125,10 @@ export function CommandCenterApp() {
 
     async function loadHoldings() {
       try {
-        const [holdingsResponse, decisionsResponse] = await Promise.all([
+        const [holdingsResponse, decisionsResponse, pricesResponse] = await Promise.all([
           fetch("/api/holdings"),
           fetch("/api/decisions"),
+          fetch("/api/prices"),
         ]);
         if (!holdingsResponse.ok) {
           throw new Error(`Holdings load failed with ${holdingsResponse.status}`);
@@ -126,13 +136,18 @@ export function CommandCenterApp() {
         if (!decisionsResponse.ok) {
           throw new Error(`Decisions load failed with ${decisionsResponse.status}`);
         }
+        if (!pricesResponse.ok) {
+          throw new Error(`Prices load failed with ${pricesResponse.status}`);
+        }
         const holdingsPayload = (await holdingsResponse.json()) as { holdings: HoldingSummary[] };
         const decisionsPayload = (await decisionsResponse.json()) as {
           decisions: DecisionLogSummary[];
         };
+        const pricesPayload = (await pricesResponse.json()) as PriceDashboardPayload;
         if (active) {
           setHoldings(holdingsPayload.holdings);
           setDecisions(decisionsPayload.decisions);
+          setPriceDashboard(pricesPayload);
         }
       } catch (error) {
         if (active) setBootstrapError(messageForError(error));
@@ -171,6 +186,7 @@ export function CommandCenterApp() {
     setBootstrap(null);
     setHoldings([]);
     setDecisions([]);
+    setPriceDashboard({ prices: [], staleWarnings: [], lastSync: null });
   }
 
   async function handleCreateHolding(input: AddHoldingInput): Promise<HoldingSummary> {
@@ -209,6 +225,20 @@ export function CommandCenterApp() {
     return created;
   }
 
+  async function handleRefreshPrices() {
+    setRefreshingPrices(true);
+    try {
+      const response = await fetch("/api/prices", { method: "POST" });
+      if (!response.ok) {
+        throw new Error(`Price refresh failed with ${response.status}`);
+      }
+      const payload = (await response.json()) as PriceDashboardPayload;
+      setPriceDashboard(payload);
+    } finally {
+      setRefreshingPrices(false);
+    }
+  }
+
   if (auth.loading) {
     return <div className="loading-screen">Checking login</div>;
   }
@@ -230,9 +260,14 @@ export function CommandCenterApp() {
       {...bootstrap}
       decisions={decisions}
       holdings={holdings}
+      lastPriceSync={priceDashboard.lastSync}
       onCreateDecision={handleCreateDecision}
       onCreateHolding={handleCreateHolding}
+      onRefreshPrices={handleRefreshPrices}
       onLogout={handleLogout}
+      prices={priceDashboard.prices}
+      refreshingPrices={refreshingPrices}
+      staleWarnings={priceDashboard.staleWarnings}
     />
   );
 }

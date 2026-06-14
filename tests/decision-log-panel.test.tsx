@@ -19,6 +19,14 @@ const holding: HoldingSummary = {
   valuationDate: "2026-06-14",
   status: "active",
   ownershipSplits: [{ ownerEntityId: "owner_1", percentage: 100 }],
+  encryptedValues: {
+    quantity: { version: 1, algorithm: "AES-GCM", iv: "iv", ciphertext: "q" },
+    costBasis: { version: 1, algorithm: "AES-GCM", iv: "iv", ciphertext: "b" },
+    currentValue: { version: 1, algorithm: "AES-GCM", iv: "iv", ciphertext: "v" },
+  },
+  autoPriceKey: null,
+  latestMarketPriceThb: null,
+  latestMarketPriceAsOf: null,
 };
 
 const decision: DecisionLogSummary = {

@@ -21,6 +21,14 @@ describe("HoldingsList", () => {
             valuationDate: "2026-06-13",
             status: "active",
             ownershipSplits: [{ ownerEntityId: "owner_1", percentage: 100 }],
+            encryptedValues: {
+              quantity: { version: 1, algorithm: "AES-GCM", iv: "iv", ciphertext: "q" },
+              costBasis: { version: 1, algorithm: "AES-GCM", iv: "iv", ciphertext: "b" },
+              currentValue: { version: 1, algorithm: "AES-GCM", iv: "iv", ciphertext: "v" },
+            },
+            autoPriceKey: null,
+            latestMarketPriceThb: null,
+            latestMarketPriceAsOf: null,
           },
         ]}
         ownerEntities={[{ id: "owner_1", displayName: "Tem", kind: "person" }]}
