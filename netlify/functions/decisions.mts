@@ -1,12 +1,12 @@
 import { getUser } from "@netlify/identity";
 import type { Config, Context } from "@netlify/functions";
 
-import { createHoldingWithManualValuation } from "../../src/server/holdings-service";
-import { NetlifyHoldingRepository } from "../../src/server/holdings-repository";
+import { createDecisionLog } from "../../src/server/discipline-service";
+import { NetlifyDecisionRepository } from "../../src/server/decisions-repository";
 import { NetlifyHouseholdRepository } from "../../src/server/households-repository";
-import type { AddHoldingInput } from "../../src/shared/holdings";
+import type { DecisionLogInput } from "../../src/shared/discipline";
 
-export default async function holdings(request: Request, _context: Context) {
+export default async function decisions(request: Request, _context: Context) {
   const identityUser = await getUser();
 
   if (!identityUser) {
@@ -25,32 +25,33 @@ export default async function holdings(request: Request, _context: Context) {
       return Response.json({ error: "Household not found." }, { status: 404 });
     }
 
-    const holdingsRepository = new NetlifyHoldingRepository();
+    const decisionRepository = new NetlifyDecisionRepository();
 
     if (request.method === "GET") {
-      const list = await holdingsRepository.listByHousehold(bootstrap.household.id);
-      return Response.json({ holdings: list });
+      const logs = await decisionRepository.listByHousehold(bootstrap.household.id);
+      return Response.json({ decisions: logs });
     }
 
     if (request.method === "POST") {
-      const payload = (await request.json()) as AddHoldingInput;
-      const created = await createHoldingWithManualValuation(holdingsRepository, {
+      const payload = (await request.json()) as DecisionLogInput;
+      const created = await createDecisionLog(decisionRepository, {
         ...payload,
         householdId: bootstrap.household.id,
-      }, profile.identityUserId);
+        actorIdentityUserId: profile.identityUserId,
+      });
       return Response.json(created, { status: 201 });
     }
 
     return Response.json({ error: "Method not allowed." }, { status: 405 });
   } catch (error) {
-    console.error("Unable to handle holdings request", error);
-    const message = error instanceof Error ? error.message : "Unable to handle holdings request.";
+    console.error("Unable to handle decisions request", error);
+    const message = error instanceof Error ? error.message : "Unable to handle decisions request.";
     return Response.json({ error: message }, { status: 500 });
   }
 }
 
 export const config: Config = {
-  path: "/api/holdings",
+  path: "/api/decisions",
 };
 
 function normalizeIdentityUser(identityUser: unknown) {

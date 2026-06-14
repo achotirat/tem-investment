@@ -1,7 +1,12 @@
 import type { AddHoldingInput, HoldingSummary, OwnershipSplitInput } from "../shared/holdings";
+import type { EncryptedField } from "../shared/encryption";
+import { validateDecisionLogInput } from "./discipline-service";
 
 export type HoldingRepository = {
-  createWithManualValuation(input: AddHoldingInput): Promise<HoldingSummary>;
+  createWithManualValuation(
+    input: AddHoldingInput,
+    actorIdentityUserId?: string,
+  ): Promise<HoldingSummary>;
 };
 
 export type OwnershipValidation =
@@ -45,6 +50,7 @@ export function validateOwnershipSplits(splits: OwnershipSplitInput[]): Ownershi
 export async function createHoldingWithManualValuation(
   repository: HoldingRepository,
   input: AddHoldingInput,
+  actorIdentityUserId?: string,
 ): Promise<HoldingSummary> {
   const ownershipValidation = validateOwnershipSplits(input.ownershipSplits);
   if (!ownershipValidation.ok) {
@@ -55,7 +61,48 @@ export async function createHoldingWithManualValuation(
     throw new Error("Phase 3 holdings must use manual valuation.");
   }
 
-  return repository.createWithManualValuation(input);
+  const disciplineValidation = validateHoldingDiscipline(input, actorIdentityUserId);
+  if (!disciplineValidation.ok) {
+    throw new Error(disciplineValidation.message);
+  }
+
+  return repository.createWithManualValuation(input, actorIdentityUserId);
+}
+
+function validateHoldingDiscipline(
+  input: AddHoldingInput,
+  actorIdentityUserId?: string,
+): OwnershipValidation {
+  if (
+    input.portfolioBucket === "P2" &&
+    input.status === "active" &&
+    !hasEncryptedField(input.encryptedValues.tradePlan)
+  ) {
+    return {
+      ok: false,
+      message: "P2 active positions require an encrypted trade plan before saving.",
+    };
+  }
+
+  if (input.decisionLog && actorIdentityUserId) {
+    const decisionValidation = validateDecisionLogInput({
+      ...input.decisionLog,
+      householdId: input.householdId,
+      actorIdentityUserId,
+      metadata: {
+        ...input.decisionLog.metadata,
+        portfolioBucket: input.portfolioBucket,
+      },
+    });
+
+    if (!decisionValidation.ok) return decisionValidation;
+  }
+
+  return { ok: true };
+}
+
+function hasEncryptedField(payload: EncryptedField | undefined): boolean {
+  return Boolean(payload?.ciphertext.trim() && payload.iv.trim());
 }
 
 function formatPercentage(value: number): string {

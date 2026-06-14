@@ -13,6 +13,7 @@ import type {
   PortfolioBucket,
   ValuationSource,
 } from "../../shared/holdings";
+import type { P2TradePlan, P3GuardrailContext } from "../../shared/discipline";
 import { prepareEncryptedHoldingSubmission } from "./encrypted-holding-submission";
 
 type AddHoldingPanelProps = {
@@ -21,6 +22,7 @@ type AddHoldingPanelProps = {
   sessionKey: CryptoKey | null;
   onCreateHolding: (input: AddHoldingInput) => Promise<void> | void;
   encryptSubmission?: (input: PlaintextHoldingInput, key: CryptoKey) => Promise<AddHoldingInput>;
+  p3GuardrailContext?: Omit<P3GuardrailContext, "candidateValueThb" | "overrideReason" | "acknowledgedLossLimitBreach">;
 };
 
 type FormState = {
@@ -37,6 +39,16 @@ type FormState = {
   valuationDate: string;
   status: HoldingStatus;
   notes: string;
+  decisionReason: string;
+  p2EntryReason: string;
+  p2Setup: string;
+  p2StopLoss: string;
+  p2TakeProfitPlan: string;
+  p2InvalidationCondition: string;
+  p2PositionSizing: string;
+  p2ExpectedHoldingPeriod: string;
+  p3OverrideReason: string;
+  p3AcknowledgedLossLimitBreach: boolean;
 };
 
 const defaultState: FormState = {
@@ -53,6 +65,16 @@ const defaultState: FormState = {
   valuationDate: new Date().toISOString().slice(0, 10),
   status: "active",
   notes: "",
+  decisionReason: "",
+  p2EntryReason: "",
+  p2Setup: "",
+  p2StopLoss: "",
+  p2TakeProfitPlan: "",
+  p2InvalidationCondition: "",
+  p2PositionSizing: "",
+  p2ExpectedHoldingPeriod: "",
+  p3OverrideReason: "",
+  p3AcknowledgedLossLimitBreach: false,
 };
 
 export function AddHoldingPanel({
@@ -61,6 +83,7 @@ export function AddHoldingPanel({
   sessionKey,
   onCreateHolding,
   encryptSubmission = prepareEncryptedHoldingSubmission,
+  p3GuardrailContext,
 }: AddHoldingPanelProps) {
   const defaultOwnerId = ownerEntities[0]?.id ?? "";
   const [form, setForm] = useState<FormState>(defaultState);
@@ -87,6 +110,12 @@ export function AddHoldingPanel({
     event.preventDefault();
     if (!sessionKey) return;
 
+    const disciplineError = validateDisciplineForm(form, p3GuardrailContext);
+    if (disciplineError) {
+      setError(disciplineError);
+      return;
+    }
+
     const ownershipTotal = ownershipSplits.reduce((sum, split) => sum + split.percentage, 0);
     if (Math.abs(ownershipTotal - 100) > 0.0001) {
       setError(`Ownership splits must total 100%. Current total is ${ownershipTotal}%.`);
@@ -101,6 +130,15 @@ export function AddHoldingPanel({
           ...form,
           householdId,
           ownershipSplits,
+          ...(form.portfolioBucket === "P2" ? { tradePlan: tradePlanFromForm(form) } : {}),
+          ...(form.portfolioBucket === "P3"
+            ? {
+                p3Acknowledgement: {
+                  overrideReason: form.p3OverrideReason,
+                  acknowledgedLossLimitBreach: form.p3AcknowledgedLossLimitBreach,
+                },
+              }
+            : {}),
         },
         sessionKey,
       );
@@ -273,6 +311,96 @@ export function AddHoldingPanel({
             Notes
             <input onChange={(event) => updateForm("notes", event.target.value)} value={form.notes} />
           </label>
+
+          {form.portfolioBucket === "P2" ? (
+            <div className="discipline-subpanel field-wide">
+              <div className="metric-label">P2 trade plan</div>
+              <div className="holding-form-grid">
+                <label className="field">
+                  Entry reason
+                  <input
+                    onChange={(event) => updateForm("p2EntryReason", event.target.value)}
+                    value={form.p2EntryReason}
+                  />
+                </label>
+                <label className="field">
+                  System / setup
+                  <input
+                    onChange={(event) => updateForm("p2Setup", event.target.value)}
+                    value={form.p2Setup}
+                  />
+                </label>
+                <label className="field">
+                  Stop loss
+                  <input
+                    onChange={(event) => updateForm("p2StopLoss", event.target.value)}
+                    value={form.p2StopLoss}
+                  />
+                </label>
+                <label className="field">
+                  Take profit plan
+                  <input
+                    onChange={(event) => updateForm("p2TakeProfitPlan", event.target.value)}
+                    value={form.p2TakeProfitPlan}
+                  />
+                </label>
+                <label className="field">
+                  Invalidation condition
+                  <input
+                    onChange={(event) => updateForm("p2InvalidationCondition", event.target.value)}
+                    value={form.p2InvalidationCondition}
+                  />
+                </label>
+                <label className="field">
+                  Position sizing
+                  <input
+                    onChange={(event) => updateForm("p2PositionSizing", event.target.value)}
+                    value={form.p2PositionSizing}
+                  />
+                </label>
+                <label className="field field-wide">
+                  Expected holding period
+                  <input
+                    onChange={(event) => updateForm("p2ExpectedHoldingPeriod", event.target.value)}
+                    value={form.p2ExpectedHoldingPeriod}
+                  />
+                </label>
+              </div>
+            </div>
+          ) : null}
+
+          {form.portfolioBucket === "P3" ? (
+            <div className="discipline-subpanel field-wide">
+              <div className="metric-label">P3 guardrail</div>
+              <label className="field">
+                P3 override reason
+                <input
+                  onChange={(event) => updateForm("p3OverrideReason", event.target.value)}
+                  value={form.p3OverrideReason}
+                />
+              </label>
+              <label className="checkbox-line">
+                <input
+                  checked={form.p3AcknowledgedLossLimitBreach}
+                  onChange={(event) =>
+                    updateForm("p3AcknowledgedLossLimitBreach", event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                I acknowledge the P3 loss-limit warning
+              </label>
+            </div>
+          ) : null}
+
+          {(form.portfolioBucket === "P2" || form.portfolioBucket === "P3") ? (
+            <label className="field field-wide">
+              Decision reason
+              <input
+                onChange={(event) => updateForm("decisionReason", event.target.value)}
+                value={form.decisionReason}
+              />
+            </label>
+          ) : null}
         </div>
 
         {error ? <div className="error-strip">{error}</div> : null}
@@ -284,4 +412,59 @@ export function AddHoldingPanel({
       </form>
     </section>
   );
+}
+
+function validateDisciplineForm(
+  form: FormState,
+  p3GuardrailContext: AddHoldingPanelProps["p3GuardrailContext"],
+): string | null {
+  if (form.portfolioBucket === "P2" && !isCompleteTradePlan(tradePlanFromForm(form))) {
+    return "P2 active positions require a complete trade plan before saving.";
+  }
+
+  if (form.portfolioBucket === "P3" && p3GuardrailContext) {
+    const candidateValueThb = Number(form.currentValue);
+    const targetValue =
+      p3GuardrailContext.portfolioTotalValueThb *
+      (p3GuardrailContext.p3TargetAllocationPercent / 100);
+    const projectedP3Value = p3GuardrailContext.p3CurrentValueThb + candidateValueThb;
+
+    if (Number.isFinite(candidateValueThb) && projectedP3Value > targetValue) {
+      if (!form.p3OverrideReason.trim()) {
+        return `P3 allocation would exceed the ${formatPercent(
+          p3GuardrailContext.p3TargetAllocationPercent,
+        )}% target. Add an override reason to save.`;
+      }
+    }
+
+    if (
+      p3GuardrailContext.maxLossPerMonthThb > 0 &&
+      p3GuardrailContext.currentMonthLossThb > p3GuardrailContext.maxLossPerMonthThb &&
+      !form.p3AcknowledgedLossLimitBreach
+    ) {
+      return "P3 monthly loss limit is already breached. Acknowledge the breach to save.";
+    }
+  }
+
+  return null;
+}
+
+function tradePlanFromForm(form: FormState): P2TradePlan {
+  return {
+    entryReason: form.p2EntryReason,
+    setup: form.p2Setup,
+    stopLoss: form.p2StopLoss,
+    takeProfitPlan: form.p2TakeProfitPlan,
+    invalidationCondition: form.p2InvalidationCondition,
+    positionSizing: form.p2PositionSizing,
+    expectedHoldingPeriod: form.p2ExpectedHoldingPeriod,
+  };
+}
+
+function isCompleteTradePlan(tradePlan: P2TradePlan): boolean {
+  return Object.values(tradePlan).every((value) => value.trim().length > 0);
+}
+
+function formatPercent(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, "");
 }
