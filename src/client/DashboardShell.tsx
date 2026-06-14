@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
   Banknote,
   CircleDollarSign,
   LayoutDashboard,
@@ -14,21 +13,25 @@ import {
 } from "lucide-react";
 
 import type { HouseholdBootstrap } from "../server/household-service";
+import type { PortfolioReviewSnapshot } from "../shared/dashboard";
 import type { DecisionLogInput, DecisionLogSummary } from "../shared/discipline";
 import type { AddHoldingInput, HoldingSummary } from "../shared/holdings";
 import type {
   MarketPriceSnapshot,
-  PortfolioValueSnapshot,
   PriceSyncSummary,
   ValuationFreshnessWarning,
 } from "../shared/pricing";
 import { SecurityPanel } from "./SecurityPanel";
+import type { DerivedMasterKey } from "./crypto/portfolio-crypto";
+import { PortfolioReviewPanel } from "./dashboard/PortfolioReviewPanel";
+import { RulesRecommendationPanel } from "./dashboard/RulesRecommendationPanel";
 import { DecisionLogPanel } from "./decisions/DecisionLogPanel";
 import { LogHoldingDecisionPanel } from "./decisions/LogHoldingDecisionPanel";
 import { AddHoldingPanel } from "./holdings/AddHoldingPanel";
 import { HoldingsList } from "./holdings/HoldingsList";
 import { PriceRefreshPanel } from "./pricing/PriceRefreshPanel";
-import { calculatePortfolioValue } from "./pricing/portfolio-valuations";
+import { calculatePortfolioReview } from "./pricing/portfolio-valuations";
+import { buildRulesBasedRecommendations } from "./recommendations/rules-recommendations";
 
 type DashboardShellProps = HouseholdBootstrap & {
   onLogout?: () => void | Promise<void>;
@@ -40,14 +43,9 @@ type DashboardShellProps = HouseholdBootstrap & {
   staleWarnings?: ValuationFreshnessWarning[];
   lastPriceSync?: PriceSyncSummary | null;
   refreshingPrices?: boolean;
+  onUnlock?: (masterPassword: string) => Promise<DerivedMasterKey>;
   onRefreshPrices?: () => Promise<void> | void;
 };
-
-const bucketTargets = [
-  { className: "", name: "P1 Store of Wealth", target: 60 },
-  { className: "p2", name: "P2 Investment / System Trading", target: 30 },
-  { className: "p3", name: "P3 Speculation", target: 10 },
-];
 
 export function DashboardShell({
   household,
@@ -62,18 +60,15 @@ export function DashboardShell({
   staleWarnings = [],
   lastPriceSync = null,
   refreshingPrices = false,
+  onUnlock,
   onRefreshPrices = async () => {},
 }: DashboardShellProps) {
   const [sessionKey, setSessionKey] = useState<CryptoKey | null>(null);
   const [localHoldings, setLocalHoldings] = useState<HoldingSummary[]>(holdings ?? []);
   const [localDecisions, setLocalDecisions] = useState<DecisionLogSummary[]>(decisions ?? []);
-  const [portfolioValue, setPortfolioValue] = useState<PortfolioValueSnapshot>({
-    locked: true,
-    baseCurrency: household.baseCurrency,
-    secondaryCurrency: household.secondaryCurrency,
-    totalBaseValue: 0,
-    totalSecondaryValue: 0,
-  });
+  const [portfolioReview, setPortfolioReview] = useState<PortfolioReviewSnapshot>(() =>
+    emptyPortfolioReview(household.baseCurrency, household.secondaryCurrency),
+  );
 
   useEffect(() => {
     if (holdings) setLocalHoldings(holdings);
@@ -86,35 +81,49 @@ export function DashboardShell({
   useEffect(() => {
     let active = true;
 
-    async function calculateValue() {
+    async function calculateReview() {
       try {
-        const nextValue = await calculatePortfolioValue({
+        const nextReview = await calculatePortfolioReview({
           holdings: localHoldings,
           prices,
           baseCurrency: household.baseCurrency,
           secondaryCurrency: household.secondaryCurrency,
+          ownerEntities,
           sessionKey,
         });
-        if (active) setPortfolioValue(nextValue);
+        if (active) setPortfolioReview(nextReview);
       } catch {
         if (active) {
-          setPortfolioValue({
-            locked: true,
-            baseCurrency: household.baseCurrency,
-            secondaryCurrency: household.secondaryCurrency,
-            totalBaseValue: 0,
-            totalSecondaryValue: 0,
-          });
+          setPortfolioReview(
+            emptyPortfolioReview(household.baseCurrency, household.secondaryCurrency),
+          );
         }
       }
     }
 
-    void calculateValue();
+    void calculateReview();
 
     return () => {
       active = false;
     };
-  }, [household.baseCurrency, household.secondaryCurrency, localHoldings, prices, sessionKey]);
+  }, [
+    household.baseCurrency,
+    household.secondaryCurrency,
+    localHoldings,
+    ownerEntities,
+    prices,
+    sessionKey,
+  ]);
+
+  const recommendations = useMemo(
+    () =>
+      buildRulesBasedRecommendations({
+        review: portfolioReview,
+        holdings: localHoldings,
+        staleWarnings,
+      }),
+    [localHoldings, portfolioReview, staleWarnings],
+  );
 
   async function handleCreateHolding(input: AddHoldingInput) {
     if (onCreateHolding) {
@@ -181,7 +190,10 @@ export function DashboardShell({
         </header>
 
         <div className="dashboard-grid">
-          <SecurityPanel onSessionChange={(session) => setSessionKey(session?.key ?? null)} />
+          <SecurityPanel
+            onSessionChange={(session) => setSessionKey(session?.key ?? null)}
+            onUnlock={onUnlock}
+          />
 
           <section className="panel span-4">
             <div className="panel-header">
@@ -194,9 +206,9 @@ export function DashboardShell({
             <div className="panel-body metric">
               <span className="metric-label">Total portfolio</span>
               <strong className="metric-value">
-                {portfolioValue.locked
+                {portfolioReview.locked
                   ? "Locked"
-                  : formatMoney(household.baseCurrency, portfolioValue.totalBaseValue)}
+                  : formatMoney(household.baseCurrency, portfolioReview.totalBaseValue)}
               </strong>
             </div>
           </section>
@@ -212,9 +224,9 @@ export function DashboardShell({
             <div className="panel-body metric">
               <span className="metric-label">Reference value</span>
               <strong className="metric-value">
-                {portfolioValue.locked
+                {portfolioReview.locked
                   ? "Locked"
-                  : formatMoney(household.secondaryCurrency, portfolioValue.totalSecondaryValue)}
+                  : formatMoney(household.secondaryCurrency, portfolioReview.totalSecondaryValue)}
               </strong>
             </div>
           </section>
@@ -237,48 +249,9 @@ export function DashboardShell({
             </div>
           </section>
 
-          <section className="panel span-8">
-            <div className="panel-header">
-              <div className="panel-title">
-                <Scale aria-hidden="true" size={18} />
-                Bucket discipline
-              </div>
-              <span className="pill">60 / 30 / 10</span>
-            </div>
-            <div className="panel-body bucket-list">
-              {bucketTargets.map((bucket) => (
-                <div className="bucket-row" key={bucket.name}>
-                  <span className="bucket-name">{bucket.name}</span>
-                  <span className="bucket-target">{bucket.target}% target</span>
-                  <div className="bucket-bar">
-                    <span className={bucket.className} style={{ width: `${bucket.target}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+          <PortfolioReviewPanel review={portfolioReview} />
 
-          <section className="panel span-4">
-            <div className="panel-header">
-              <div className="panel-title">
-                <AlertTriangle aria-hidden="true" size={18} />
-                Warnings
-              </div>
-              <span className="pill">{staleWarnings.length} open</span>
-            </div>
-            <div className="panel-body empty-list">
-              {staleWarnings.length === 0 ? (
-                <div className="empty-state">No warnings yet</div>
-              ) : (
-                staleWarnings.map((warning) => (
-                  <div className="stale-row" key={warning.holdingId}>
-                    <strong>{warning.assetLabel}</strong>
-                    <small>Valuation is {warning.daysOld} days old</small>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
+          <RulesRecommendationPanel recommendations={recommendations} />
 
           <PriceRefreshPanel
             lastSync={lastPriceSync}
@@ -333,6 +306,54 @@ function summaryFromInput(input: AddHoldingInput): HoldingSummary {
     autoPriceKey: null,
     latestMarketPriceThb: null,
     latestMarketPriceAsOf: null,
+  };
+}
+
+function emptyPortfolioReview(
+  baseCurrency: string,
+  secondaryCurrency: string,
+): PortfolioReviewSnapshot {
+  return {
+    locked: true,
+    baseCurrency,
+    secondaryCurrency,
+    totalBaseValue: 0,
+    totalSecondaryValue: 0,
+    bucketAllocations: [
+      {
+        key: "P1",
+        label: "P1 Store of Wealth",
+        targetPercent: 60,
+        valueBase: 0,
+        percent: 0,
+        driftPercent: -60,
+      },
+      {
+        key: "P2",
+        label: "P2 Investment / System Trading",
+        targetPercent: 30,
+        valueBase: 0,
+        percent: 0,
+        driftPercent: -30,
+      },
+      {
+        key: "P3",
+        label: "P3 Speculation",
+        targetPercent: 10,
+        valueBase: 0,
+        percent: 0,
+        driftPercent: -10,
+      },
+    ],
+    ownerNetWorth: [],
+    exposures: {
+      assetClass: [],
+      platform: [],
+      currency: [],
+      owner: [],
+      liquidity: [],
+      leverage: [],
+    },
   };
 }
 

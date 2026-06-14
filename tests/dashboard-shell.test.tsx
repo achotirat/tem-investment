@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { DashboardShell } from "../src/client/DashboardShell";
@@ -12,6 +12,23 @@ describe("LoginPanel", () => {
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Log in" })).toBeEnabled();
+  });
+
+  it("offers optional demo access without entering credentials", () => {
+    const onDemoLogin = vi.fn();
+
+    render(
+      <LoginPanel
+        error={null}
+        loading={false}
+        onDemoLogin={onDemoLogin}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Use demo" }));
+
+    expect(onDemoLogin).toHaveBeenCalledTimes(1);
   });
 });
 
