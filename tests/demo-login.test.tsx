@@ -32,5 +32,10 @@ describe("CommandCenterApp demo login", () => {
 
     await waitFor(() => expect(screen.getByText("Sensitive data unlocked")).toBeInTheDocument());
     expect(screen.getByText("PBKDF2 fallback")).toBeInTheDocument();
+    expect(await screen.findByText("Allocation review")).toBeInTheDocument();
+    expect(screen.getByText("Owner net worth")).toBeInTheDocument();
+    expect(screen.getByText("Concentration views")).toBeInTheDocument();
+    expect(screen.getByText("Rules-based recommendations")).toBeInTheDocument();
+    expect(await screen.findByText("P3 is above its speculation cap")).toBeInTheDocument();
   });
 });

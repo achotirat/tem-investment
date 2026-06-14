@@ -76,6 +76,33 @@ export async function createDemoWorkspace(): Promise<DemoWorkspace> {
       ownerEntityId: DEMO_OWNER_ID,
       autoPriceKey: "set:SET",
       latestMarketPriceThb: 120,
+      tradePlan: JSON.stringify({
+        entryReason: "System breakout with monthly risk inside plan.",
+        setup: "SET trend-following system",
+        stopLoss: "Close below system stop",
+        takeProfitPlan: "Trail with system signal",
+        invalidationCondition: "System exit signal",
+        positionSizing: "1 risk unit",
+        expectedHoldingPeriod: "1-2 years",
+      }),
+    }),
+    await createDemoHolding(key, {
+      id: "demo_tfex_speculation",
+      portfolioBucket: "P3",
+      assetClass: "derivative",
+      assetLabel: "TFEX speculation sleeve",
+      accountLabel: "Broker",
+      currency: "THB",
+      liquidityCategory: "liquid",
+      valuationSource: "manual",
+      valuationDate: "2026-06-15",
+      quantity: "1",
+      costBasis: "400000",
+      currentValue: "550000",
+      ownerEntityId: DEMO_OWNER_ID,
+      autoPriceKey: "configured:TFEX",
+      latestMarketPriceThb: 550000,
+      p3OverrideReason: "Demo scenario showing the P3 cap warning.",
     }),
   ];
 
@@ -174,8 +201,22 @@ async function createDemoHolding(
     ownerEntityId: string;
     autoPriceKey: string;
     latestMarketPriceThb: number;
+    tradePlan?: string;
+    p3OverrideReason?: string;
   },
 ): Promise<HoldingSummary> {
+  const encryptedValues: HoldingSummary["encryptedValues"] = {
+    quantity: await encryptSensitiveField(input.quantity, key),
+    costBasis: await encryptSensitiveField(input.costBasis, key),
+    currentValue: await encryptSensitiveField(input.currentValue, key),
+  };
+  if (input.tradePlan) {
+    encryptedValues.tradePlan = await encryptSensitiveField(input.tradePlan, key);
+  }
+  if (input.p3OverrideReason) {
+    encryptedValues.p3OverrideReason = await encryptSensitiveField(input.p3OverrideReason, key);
+  }
+
   return {
     id: input.id,
     householdId: DEMO_HOUSEHOLD_ID,
@@ -189,11 +230,7 @@ async function createDemoHolding(
     valuationDate: input.valuationDate,
     status: "active",
     ownershipSplits: [{ ownerEntityId: input.ownerEntityId, percentage: 100 }],
-    encryptedValues: {
-      quantity: await encryptSensitiveField(input.quantity, key),
-      costBasis: await encryptSensitiveField(input.costBasis, key),
-      currentValue: await encryptSensitiveField(input.currentValue, key),
-    },
+    encryptedValues,
     autoPriceKey: input.autoPriceKey,
     latestMarketPriceThb: input.latestMarketPriceThb,
     latestMarketPriceAsOf: "2026-06-15T02:00:00.000Z",
