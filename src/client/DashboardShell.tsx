@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   Banknote,
@@ -13,10 +14,15 @@ import {
 } from "lucide-react";
 
 import type { HouseholdBootstrap } from "../server/household-service";
+import type { AddHoldingInput, HoldingSummary } from "../shared/holdings";
 import { SecurityPanel } from "./SecurityPanel";
+import { AddHoldingPanel } from "./holdings/AddHoldingPanel";
+import { HoldingsList } from "./holdings/HoldingsList";
 
 type DashboardShellProps = HouseholdBootstrap & {
   onLogout?: () => void | Promise<void>;
+  holdings?: HoldingSummary[];
+  onCreateHolding?: (input: AddHoldingInput) => Promise<HoldingSummary>;
 };
 
 const bucketTargets = [
@@ -30,7 +36,25 @@ export function DashboardShell({
   member,
   ownerEntities,
   onLogout,
+  holdings,
+  onCreateHolding,
 }: DashboardShellProps) {
+  const [sessionKey, setSessionKey] = useState<CryptoKey | null>(null);
+  const [localHoldings, setLocalHoldings] = useState<HoldingSummary[]>(holdings ?? []);
+
+  useEffect(() => {
+    if (holdings) setLocalHoldings(holdings);
+  }, [holdings]);
+
+  async function handleCreateHolding(input: AddHoldingInput) {
+    if (onCreateHolding) {
+      await onCreateHolding(input);
+      return;
+    }
+
+    setLocalHoldings((current) => [summaryFromInput(input), ...current]);
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar" aria-label="Portfolio navigation">
@@ -78,7 +102,7 @@ export function DashboardShell({
         </header>
 
         <div className="dashboard-grid">
-          <SecurityPanel />
+          <SecurityPanel onSessionChange={(session) => setSessionKey(session?.key ?? null)} />
 
           <section className="panel span-4">
             <div className="panel-header">
@@ -160,20 +184,36 @@ export function DashboardShell({
             </div>
           </section>
 
-          <section className="panel span-12">
-            <div className="panel-header">
-              <div className="panel-title">
-                <WalletCards aria-hidden="true" size={18} />
-                Holdings
-              </div>
-              <span className="pill">0 active</span>
-            </div>
-            <div className="panel-body">
-              <div className="empty-state">No holdings recorded yet</div>
-            </div>
-          </section>
+          <AddHoldingPanel
+            householdId={household.id}
+            onCreateHolding={handleCreateHolding}
+            ownerEntities={ownerEntities}
+            sessionKey={sessionKey}
+          />
+
+          <HoldingsList holdings={localHoldings} ownerEntities={ownerEntities} />
         </div>
       </section>
     </main>
   );
+}
+
+function summaryFromInput(input: AddHoldingInput): HoldingSummary {
+  return {
+    id:
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `holding_${Date.now()}`,
+    householdId: input.householdId,
+    portfolioBucket: input.portfolioBucket,
+    assetClass: input.assetClass,
+    assetLabel: input.assetLabel,
+    accountLabel: input.accountLabel,
+    currency: input.currency,
+    liquidityCategory: input.liquidityCategory,
+    valuationSource: input.valuationSource,
+    valuationDate: input.valuationDate,
+    status: input.status,
+    ownershipSplits: input.ownershipSplits,
+  };
 }

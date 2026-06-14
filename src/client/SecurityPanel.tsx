@@ -13,7 +13,7 @@ import {
   type DerivedMasterKey,
   type KeyDerivationMethod,
 } from "./crypto/portfolio-crypto";
-import { UnlockSessionManager } from "./crypto/unlock-session";
+import { UnlockSessionManager, type UnlockSession } from "./crypto/unlock-session";
 import { secureRandomBytes } from "./crypto/encoding";
 
 type UnlockResult = {
@@ -24,11 +24,13 @@ type UnlockResult = {
 type SecurityPanelProps = {
   onUnlock?: (masterPassword: string) => Promise<UnlockResult>;
   createRecoveryKey?: () => Promise<RecoveryKeyMaterial>;
+  onSessionChange?: (session: UnlockSession | null) => void;
 };
 
 export function SecurityPanel({
   onUnlock = defaultUnlock,
   createRecoveryKey = createRecoveryKeyMaterial,
+  onSessionChange,
 }: SecurityPanelProps) {
   const session = useMemo(() => new UnlockSessionManager(), []);
   const [masterPassword, setMasterPassword] = useState("");
@@ -47,10 +49,11 @@ export function SecurityPanel({
 
     try {
       const result = await onUnlock(masterPassword);
-      session.unlock(result);
+      const unlockSession = session.unlock(result);
       setUnlocked(true);
       setUnlockMethod(result.method);
       setMasterPassword("");
+      onSessionChange?.(unlockSession);
     } catch (unlockError) {
       setError(unlockError instanceof Error ? unlockError.message : "Unable to unlock.");
     } finally {
@@ -62,6 +65,7 @@ export function SecurityPanel({
     session.lock();
     setUnlocked(false);
     setUnlockMethod(null);
+    onSessionChange?.(null);
   }
 
   async function handleGenerateRecoveryKey() {

@@ -32,7 +32,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -106,7 +107,8 @@ button:disabled {
   text-transform: uppercase;
 }
 
-.field input {
+.field input,
+.field select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -499,6 +501,80 @@ button:disabled {
   font-weight: 900;
 }
 
+.holding-form {
+  display: grid;
+  gap: 14px;
+}
+
+.holding-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.field-wide {
+  grid-column: 1 / -1;
+}
+
+.holdings-table {
+  display: grid;
+  gap: 8px;
+}
+
+.holdings-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.2fr) minmax(110px, 1fr) 72px minmax(120px, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 56px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 10px 12px;
+}
+
+.holdings-head {
+  min-height: 36px;
+  background: var(--field);
+  color: var(--muted-ink);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.holdings-row strong,
+.holdings-row small {
+  display: block;
+}
+
+.holdings-row small {
+  color: var(--muted-ink);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.bucket-badge {
+  display: inline-grid;
+  min-width: 42px;
+  min-height: 30px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--green-soft);
+  color: var(--green);
+  font-weight: 900;
+}
+
+.bucket-badge.p2 {
+  background: #dbeaf0;
+  color: var(--blue);
+}
+
+.bucket-badge.p3 {
+  background: var(--amber-soft);
+  color: #6d440d;
+}
+
 .checkbox-line {
   display: flex;
   align-items: center;
@@ -549,5 +625,14 @@ button:disabled {
 
   .security-grid {
     grid-template-columns: 1fr;
+  }
+
+  .holding-form-grid,
+  .holdings-row {
+    grid-template-columns: 1fr;
+  }
+
+  .holdings-head {
+    display: none;
   }
 }
