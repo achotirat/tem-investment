@@ -516,6 +516,15 @@ button:disabled {
   grid-column: 1 / -1;
 }
 
+.discipline-subpanel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  padding: 12px;
+}
+
 .holdings-table {
   display: grid;
   gap: 8px;
@@ -575,6 +584,34 @@ button:disabled {
   color: #6d440d;
 }
 
+.decision-list {
+  display: grid;
+  gap: 8px;
+}
+
+.decision-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 54px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 10px 12px;
+}
+
+.decision-row strong,
+.decision-row small {
+  display: block;
+}
+
+.decision-row small {
+  color: var(--muted-ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .checkbox-line {
   display: flex;
   align-items: center;
@@ -628,7 +665,8 @@ button:disabled {
   }
 
   .holding-form-grid,
-  .holdings-row {
+  .holdings-row,
+  .decision-row {
     grid-template-columns: 1fr;
   }
 

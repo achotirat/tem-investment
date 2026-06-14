@@ -2,6 +2,7 @@ import { getDatabase } from "@netlify/database";
 
 import type { AddHoldingInput, HoldingSummary, OwnershipSplitInput } from "../shared/holdings";
 import type { HoldingRepository } from "./holdings-service";
+import { NetlifyDecisionRepository } from "./decisions-repository";
 
 type NetlifyDatabase = ReturnType<typeof getDatabase>;
 
@@ -24,7 +25,10 @@ type HoldingRow = {
 export class NetlifyHoldingRepository implements HoldingRepository {
   constructor(private readonly database: NetlifyDatabase = getDatabase()) {}
 
-  async createWithManualValuation(input: AddHoldingInput): Promise<HoldingSummary> {
+  async createWithManualValuation(
+    input: AddHoldingInput,
+    actorIdentityUserId?: string,
+  ): Promise<HoldingSummary> {
     const encryptedValuesJson = JSON.stringify(input.encryptedValues);
     const ownershipSplitsJson = JSON.stringify(input.ownershipSplits);
     const encryptedCurrentValueJson = JSON.stringify(input.encryptedValues.currentValue);
@@ -127,7 +131,24 @@ export class NetlifyHoldingRepository implements HoldingRepository {
       ORDER BY ownership.owner_entity_id ASC
     `;
 
-    return mapHoldingRows(rows);
+    const holding = mapHoldingRows(rows);
+
+    if (input.decisionLog && actorIdentityUserId) {
+      const decisionRepository = new NetlifyDecisionRepository(this.database);
+      await decisionRepository.create({
+        ...input.decisionLog,
+        householdId: input.householdId,
+        holdingId: holding.id,
+        actorIdentityUserId,
+        metadata: {
+          ...input.decisionLog.metadata,
+          portfolioBucket: input.portfolioBucket,
+          assetLabel: input.assetLabel,
+        },
+      });
+    }
+
+    return holding;
   }
 
   async listByHousehold(householdId: string): Promise<HoldingSummary[]> {

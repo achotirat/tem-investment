@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getUser, handleAuthCallback, login, logout, onAuthChange } from "@netlify/identity";
 
 import type { HouseholdBootstrap } from "../server/household-service";
+import type { DecisionLogInput, DecisionLogSummary } from "../shared/discipline";
 import type { AddHoldingInput, HoldingSummary } from "../shared/holdings";
 import { DashboardShell } from "./DashboardShell";
 import { LoginPanel } from "./LoginPanel";
@@ -30,6 +31,7 @@ export function CommandCenterApp() {
   const [bootstrap, setBootstrap] = useState<HouseholdBootstrap | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [holdings, setHoldings] = useState<HoldingSummary[]>([]);
+  const [decisions, setDecisions] = useState<DecisionLogSummary[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -76,6 +78,7 @@ export function CommandCenterApp() {
     if (!auth.user) {
       setBootstrap(null);
       setHoldings([]);
+      setDecisions([]);
       return;
     }
 
@@ -105,6 +108,7 @@ export function CommandCenterApp() {
   useEffect(() => {
     if (!bootstrap) {
       setHoldings([]);
+      setDecisions([]);
       return;
     }
 
@@ -112,12 +116,24 @@ export function CommandCenterApp() {
 
     async function loadHoldings() {
       try {
-        const response = await fetch("/api/holdings");
-        if (!response.ok) {
-          throw new Error(`Holdings load failed with ${response.status}`);
+        const [holdingsResponse, decisionsResponse] = await Promise.all([
+          fetch("/api/holdings"),
+          fetch("/api/decisions"),
+        ]);
+        if (!holdingsResponse.ok) {
+          throw new Error(`Holdings load failed with ${holdingsResponse.status}`);
         }
-        const payload = (await response.json()) as { holdings: HoldingSummary[] };
-        if (active) setHoldings(payload.holdings);
+        if (!decisionsResponse.ok) {
+          throw new Error(`Decisions load failed with ${decisionsResponse.status}`);
+        }
+        const holdingsPayload = (await holdingsResponse.json()) as { holdings: HoldingSummary[] };
+        const decisionsPayload = (await decisionsResponse.json()) as {
+          decisions: DecisionLogSummary[];
+        };
+        if (active) {
+          setHoldings(holdingsPayload.holdings);
+          setDecisions(decisionsPayload.decisions);
+        }
       } catch (error) {
         if (active) setBootstrapError(messageForError(error));
       }
@@ -154,6 +170,7 @@ export function CommandCenterApp() {
     setAuth((current) => ({ ...current, user: null }));
     setBootstrap(null);
     setHoldings([]);
+    setDecisions([]);
   }
 
   async function handleCreateHolding(input: AddHoldingInput): Promise<HoldingSummary> {
@@ -171,6 +188,24 @@ export function CommandCenterApp() {
 
     const created = (await response.json()) as HoldingSummary;
     setHoldings((current) => [created, ...current]);
+    return created;
+  }
+
+  async function handleCreateDecision(input: DecisionLogInput): Promise<DecisionLogSummary> {
+    const response = await fetch("/api/decisions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Decision save failed with ${response.status}`);
+    }
+
+    const created = (await response.json()) as DecisionLogSummary;
+    setDecisions((current) => [created, ...current]);
     return created;
   }
 
@@ -193,7 +228,9 @@ export function CommandCenterApp() {
   return (
     <DashboardShell
       {...bootstrap}
+      decisions={decisions}
       holdings={holdings}
+      onCreateDecision={handleCreateDecision}
       onCreateHolding={handleCreateHolding}
       onLogout={handleLogout}
     />

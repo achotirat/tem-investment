@@ -1,4 +1,9 @@
 import type { EncryptedField } from "./encryption";
+import type {
+  CreateHoldingDecisionLogInput,
+  P2TradePlan,
+  P3GuardrailAcknowledgement,
+} from "./discipline";
 
 export type PortfolioBucket = "P1" | "P2" | "P3";
 export type AssetClass = "real_estate" | "stock" | "derivative" | "crypto" | "gold" | "cash" | "other";
@@ -16,6 +21,8 @@ export type EncryptedHoldingValues = {
   costBasis: EncryptedField;
   currentValue: EncryptedField;
   notes?: EncryptedField;
+  tradePlan?: EncryptedField;
+  p3OverrideReason?: EncryptedField;
 };
 
 export type AddHoldingInput = {
@@ -31,6 +38,7 @@ export type AddHoldingInput = {
   status: HoldingStatus;
   ownershipSplits: OwnershipSplitInput[];
   encryptedValues: EncryptedHoldingValues;
+  decisionLog?: CreateHoldingDecisionLogInput;
 };
 
 export type PlaintextHoldingInput = Omit<AddHoldingInput, "encryptedValues"> & {
@@ -38,6 +46,9 @@ export type PlaintextHoldingInput = Omit<AddHoldingInput, "encryptedValues"> & {
   costBasis: string;
   currentValue: string;
   notes?: string;
+  tradePlan?: P2TradePlan;
+  p3Acknowledgement?: P3GuardrailAcknowledgement;
+  decisionReason?: string;
 };
 
 export type HoldingSummary = {

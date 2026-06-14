@@ -14,8 +14,11 @@ import {
 } from "lucide-react";
 
 import type { HouseholdBootstrap } from "../server/household-service";
+import type { DecisionLogInput, DecisionLogSummary } from "../shared/discipline";
 import type { AddHoldingInput, HoldingSummary } from "../shared/holdings";
 import { SecurityPanel } from "./SecurityPanel";
+import { DecisionLogPanel } from "./decisions/DecisionLogPanel";
+import { LogHoldingDecisionPanel } from "./decisions/LogHoldingDecisionPanel";
 import { AddHoldingPanel } from "./holdings/AddHoldingPanel";
 import { HoldingsList } from "./holdings/HoldingsList";
 
@@ -23,6 +26,8 @@ type DashboardShellProps = HouseholdBootstrap & {
   onLogout?: () => void | Promise<void>;
   holdings?: HoldingSummary[];
   onCreateHolding?: (input: AddHoldingInput) => Promise<HoldingSummary>;
+  decisions?: DecisionLogSummary[];
+  onCreateDecision?: (input: DecisionLogInput) => Promise<DecisionLogSummary>;
 };
 
 const bucketTargets = [
@@ -38,13 +43,20 @@ export function DashboardShell({
   onLogout,
   holdings,
   onCreateHolding,
+  decisions,
+  onCreateDecision,
 }: DashboardShellProps) {
   const [sessionKey, setSessionKey] = useState<CryptoKey | null>(null);
   const [localHoldings, setLocalHoldings] = useState<HoldingSummary[]>(holdings ?? []);
+  const [localDecisions, setLocalDecisions] = useState<DecisionLogSummary[]>(decisions ?? []);
 
   useEffect(() => {
     if (holdings) setLocalHoldings(holdings);
   }, [holdings]);
+
+  useEffect(() => {
+    if (decisions) setLocalDecisions(decisions);
+  }, [decisions]);
 
   async function handleCreateHolding(input: AddHoldingInput) {
     if (onCreateHolding) {
@@ -53,6 +65,15 @@ export function DashboardShell({
     }
 
     setLocalHoldings((current) => [summaryFromInput(input), ...current]);
+  }
+
+  async function handleCreateDecision(input: DecisionLogInput) {
+    if (onCreateDecision) {
+      await onCreateDecision(input);
+      return;
+    }
+
+    setLocalDecisions((current) => [summaryFromDecisionInput(input), ...current]);
   }
 
   return (
@@ -192,6 +213,16 @@ export function DashboardShell({
           />
 
           <HoldingsList holdings={localHoldings} ownerEntities={ownerEntities} />
+
+          <LogHoldingDecisionPanel
+            actorIdentityUserId={member.identityUserId}
+            holdings={localHoldings}
+            householdId={household.id}
+            onCreateDecision={handleCreateDecision}
+            sessionKey={sessionKey}
+          />
+
+          <DecisionLogPanel decisions={localDecisions} />
         </div>
       </section>
     </main>
@@ -215,5 +246,22 @@ function summaryFromInput(input: AddHoldingInput): HoldingSummary {
     valuationDate: input.valuationDate,
     status: input.status,
     ownershipSplits: input.ownershipSplits,
+  };
+}
+
+function summaryFromDecisionInput(input: DecisionLogInput): DecisionLogSummary {
+  return {
+    id:
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `decision_${Date.now()}`,
+    householdId: input.householdId,
+    holdingId: input.holdingId,
+    actorIdentityUserId: input.actorIdentityUserId,
+    action: input.action,
+    scope: input.scope,
+    reasonRequired: input.reasonRequired,
+    metadata: input.metadata,
+    createdAt: new Date().toISOString(),
   };
 }
