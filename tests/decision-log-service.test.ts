@@ -87,6 +87,10 @@ class InMemoryHoldingRepository implements HoldingRepository {
       valuationDate: input.valuationDate,
       status: input.status,
       ownershipSplits: input.ownershipSplits,
+      encryptedValues: input.encryptedValues,
+      autoPriceKey: null,
+      latestMarketPriceThb: null,
+      latestMarketPriceAsOf: null,
     };
   }
 }

@@ -16,11 +16,19 @@ import {
 import type { HouseholdBootstrap } from "../server/household-service";
 import type { DecisionLogInput, DecisionLogSummary } from "../shared/discipline";
 import type { AddHoldingInput, HoldingSummary } from "../shared/holdings";
+import type {
+  MarketPriceSnapshot,
+  PortfolioValueSnapshot,
+  PriceSyncSummary,
+  ValuationFreshnessWarning,
+} from "../shared/pricing";
 import { SecurityPanel } from "./SecurityPanel";
 import { DecisionLogPanel } from "./decisions/DecisionLogPanel";
 import { LogHoldingDecisionPanel } from "./decisions/LogHoldingDecisionPanel";
 import { AddHoldingPanel } from "./holdings/AddHoldingPanel";
 import { HoldingsList } from "./holdings/HoldingsList";
+import { PriceRefreshPanel } from "./pricing/PriceRefreshPanel";
+import { calculatePortfolioValue } from "./pricing/portfolio-valuations";
 
 type DashboardShellProps = HouseholdBootstrap & {
   onLogout?: () => void | Promise<void>;
@@ -28,6 +36,11 @@ type DashboardShellProps = HouseholdBootstrap & {
   onCreateHolding?: (input: AddHoldingInput) => Promise<HoldingSummary>;
   decisions?: DecisionLogSummary[];
   onCreateDecision?: (input: DecisionLogInput) => Promise<DecisionLogSummary>;
+  prices?: MarketPriceSnapshot[];
+  staleWarnings?: ValuationFreshnessWarning[];
+  lastPriceSync?: PriceSyncSummary | null;
+  refreshingPrices?: boolean;
+  onRefreshPrices?: () => Promise<void> | void;
 };
 
 const bucketTargets = [
@@ -45,10 +58,22 @@ export function DashboardShell({
   onCreateHolding,
   decisions,
   onCreateDecision,
+  prices = [],
+  staleWarnings = [],
+  lastPriceSync = null,
+  refreshingPrices = false,
+  onRefreshPrices = async () => {},
 }: DashboardShellProps) {
   const [sessionKey, setSessionKey] = useState<CryptoKey | null>(null);
   const [localHoldings, setLocalHoldings] = useState<HoldingSummary[]>(holdings ?? []);
   const [localDecisions, setLocalDecisions] = useState<DecisionLogSummary[]>(decisions ?? []);
+  const [portfolioValue, setPortfolioValue] = useState<PortfolioValueSnapshot>({
+    locked: true,
+    baseCurrency: household.baseCurrency,
+    secondaryCurrency: household.secondaryCurrency,
+    totalBaseValue: 0,
+    totalSecondaryValue: 0,
+  });
 
   useEffect(() => {
     if (holdings) setLocalHoldings(holdings);
@@ -57,6 +82,39 @@ export function DashboardShell({
   useEffect(() => {
     if (decisions) setLocalDecisions(decisions);
   }, [decisions]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function calculateValue() {
+      try {
+        const nextValue = await calculatePortfolioValue({
+          holdings: localHoldings,
+          prices,
+          baseCurrency: household.baseCurrency,
+          secondaryCurrency: household.secondaryCurrency,
+          sessionKey,
+        });
+        if (active) setPortfolioValue(nextValue);
+      } catch {
+        if (active) {
+          setPortfolioValue({
+            locked: true,
+            baseCurrency: household.baseCurrency,
+            secondaryCurrency: household.secondaryCurrency,
+            totalBaseValue: 0,
+            totalSecondaryValue: 0,
+          });
+        }
+      }
+    }
+
+    void calculateValue();
+
+    return () => {
+      active = false;
+    };
+  }, [household.baseCurrency, household.secondaryCurrency, localHoldings, prices, sessionKey]);
 
   async function handleCreateHolding(input: AddHoldingInput) {
     if (onCreateHolding) {
@@ -135,7 +193,11 @@ export function DashboardShell({
             </div>
             <div className="panel-body metric">
               <span className="metric-label">Total portfolio</span>
-              <strong className="metric-value">THB 0</strong>
+              <strong className="metric-value">
+                {portfolioValue.locked
+                  ? "Locked"
+                  : formatMoney(household.baseCurrency, portfolioValue.totalBaseValue)}
+              </strong>
             </div>
           </section>
 
@@ -149,7 +211,11 @@ export function DashboardShell({
             </div>
             <div className="panel-body metric">
               <span className="metric-label">Reference value</span>
-              <strong className="metric-value">USD 0</strong>
+              <strong className="metric-value">
+                {portfolioValue.locked
+                  ? "Locked"
+                  : formatMoney(household.secondaryCurrency, portfolioValue.totalSecondaryValue)}
+              </strong>
             </div>
           </section>
 
@@ -198,12 +264,29 @@ export function DashboardShell({
                 <AlertTriangle aria-hidden="true" size={18} />
                 Warnings
               </div>
-              <span className="pill">0 open</span>
+              <span className="pill">{staleWarnings.length} open</span>
             </div>
             <div className="panel-body empty-list">
-              <div className="empty-state">No warnings yet</div>
+              {staleWarnings.length === 0 ? (
+                <div className="empty-state">No warnings yet</div>
+              ) : (
+                staleWarnings.map((warning) => (
+                  <div className="stale-row" key={warning.holdingId}>
+                    <strong>{warning.assetLabel}</strong>
+                    <small>Valuation is {warning.daysOld} days old</small>
+                  </div>
+                ))
+              )}
             </div>
           </section>
+
+          <PriceRefreshPanel
+            lastSync={lastPriceSync}
+            onRefreshPrices={onRefreshPrices}
+            prices={prices}
+            refreshing={refreshingPrices}
+            staleWarnings={staleWarnings}
+          />
 
           <AddHoldingPanel
             householdId={household.id}
@@ -246,7 +329,19 @@ function summaryFromInput(input: AddHoldingInput): HoldingSummary {
     valuationDate: input.valuationDate,
     status: input.status,
     ownershipSplits: input.ownershipSplits,
+    encryptedValues: input.encryptedValues,
+    autoPriceKey: null,
+    latestMarketPriceThb: null,
+    latestMarketPriceAsOf: null,
   };
+}
+
+function formatMoney(currency: string, value: number): string {
+  return new Intl.NumberFormat("en", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: currency === "THB" ? 0 : 2,
+  }).format(value);
 }
 
 function summaryFromDecisionInput(input: DecisionLogInput): DecisionLogSummary {

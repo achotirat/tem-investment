@@ -3,6 +3,7 @@ import { getDatabase } from "@netlify/database";
 import type { AddHoldingInput, HoldingSummary, OwnershipSplitInput } from "../shared/holdings";
 import type { HoldingRepository } from "./holdings-service";
 import { NetlifyDecisionRepository } from "./decisions-repository";
+import { deriveAutoPriceKey } from "./pricing-service";
 
 type NetlifyDatabase = ReturnType<typeof getDatabase>;
 
@@ -18,6 +19,10 @@ type HoldingRow = {
   valuation_source: HoldingSummary["valuationSource"];
   valuation_date: string | Date;
   status: HoldingSummary["status"];
+  encrypted_values: AddHoldingInput["encryptedValues"] | string;
+  auto_price_key: string | null;
+  latest_market_price_thb: string | number | null;
+  latest_market_price_as_of: string | Date | null;
   owner_entity_id: string | null;
   percentage: string | number | null;
 };
@@ -32,6 +37,11 @@ export class NetlifyHoldingRepository implements HoldingRepository {
     const encryptedValuesJson = JSON.stringify(input.encryptedValues);
     const ownershipSplitsJson = JSON.stringify(input.ownershipSplits);
     const encryptedCurrentValueJson = JSON.stringify(input.encryptedValues.currentValue);
+    const autoPriceKey = deriveAutoPriceKey({
+      assetClass: input.assetClass,
+      assetLabel: input.assetLabel,
+      currency: input.currency,
+    });
 
     const rows = await this.database.sql<HoldingRow>`
       WITH account AS (
@@ -53,6 +63,7 @@ export class NetlifyHoldingRepository implements HoldingRepository {
           valuation_source,
           valuation_date,
           status,
+          auto_price_key,
           encrypted_values
         )
         SELECT
@@ -66,6 +77,7 @@ export class NetlifyHoldingRepository implements HoldingRepository {
           ${input.valuationSource},
           ${input.valuationDate}::date,
           ${input.status},
+          ${autoPriceKey},
           ${encryptedValuesJson}::jsonb
         FROM account
         RETURNING
@@ -79,7 +91,11 @@ export class NetlifyHoldingRepository implements HoldingRepository {
           liquidity_category,
           valuation_source,
           valuation_date,
-          status
+          status,
+          encrypted_values,
+          auto_price_key,
+          latest_market_price_thb,
+          latest_market_price_as_of
       ),
       ownership AS (
         INSERT INTO holding_ownership_splits (holding_id, owner_entity_id, percentage)
@@ -123,6 +139,10 @@ export class NetlifyHoldingRepository implements HoldingRepository {
         holding.valuation_source,
         holding.valuation_date,
         holding.status,
+        holding.encrypted_values,
+        holding.auto_price_key,
+        holding.latest_market_price_thb,
+        holding.latest_market_price_as_of,
         ownership.owner_entity_id,
         ownership.percentage
       FROM holding
@@ -165,6 +185,10 @@ export class NetlifyHoldingRepository implements HoldingRepository {
         h.valuation_source,
         h.valuation_date,
         h.status,
+        h.encrypted_values,
+        h.auto_price_key,
+        h.latest_market_price_thb,
+        h.latest_market_price_as_of,
         s.owner_entity_id,
         s.percentage
       FROM holdings h
@@ -210,6 +234,13 @@ function mapHoldingRows(rows: HoldingRow[]): HoldingSummary {
         ? first.valuation_date.toISOString().slice(0, 10)
         : String(first.valuation_date),
     status: first.status,
+    encryptedValues: normalizeEncryptedValues(first.encrypted_values),
+    autoPriceKey: first.auto_price_key,
+    latestMarketPriceThb:
+      first.latest_market_price_thb === null ? null : Number(first.latest_market_price_thb),
+    latestMarketPriceAsOf: first.latest_market_price_as_of
+      ? toIsoDateTime(first.latest_market_price_as_of)
+      : null,
     ownershipSplits: rows
       .filter((row) => row.owner_entity_id && row.percentage !== null)
       .map(
@@ -219,4 +250,14 @@ function mapHoldingRows(rows: HoldingRow[]): HoldingSummary {
         }),
       ),
   };
+}
+
+function normalizeEncryptedValues(
+  encryptedValues: AddHoldingInput["encryptedValues"] | string,
+): AddHoldingInput["encryptedValues"] {
+  return typeof encryptedValues === "string" ? JSON.parse(encryptedValues) : encryptedValues;
+}
+
+function toIsoDateTime(value: string | Date): string {
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
