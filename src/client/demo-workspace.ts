@@ -3,6 +3,7 @@
 import type { HouseholdBootstrap } from "../server/household-service";
 import type { DecisionLogSummary } from "../shared/discipline";
 import type { HoldingSummary } from "../shared/holdings";
+import type { NotificationSummary } from "../shared/notifications";
 import type { PriceDashboardPayload } from "../shared/pricing";
 import { encryptSensitiveField, type DerivedMasterKey } from "./crypto/portfolio-crypto";
 
@@ -10,6 +11,7 @@ export type DemoWorkspace = {
   bootstrap: HouseholdBootstrap;
   holdings: HoldingSummary[];
   decisions: DecisionLogSummary[];
+  notifications: NotificationSummary[];
   priceDashboard: PriceDashboardPayload;
 };
 
@@ -139,6 +141,44 @@ export async function createDemoWorkspace(): Promise<DemoWorkspace> {
           assetLabel: "SET system trade",
         },
         createdAt: "2026-06-15T02:00:00.000Z",
+      },
+    ],
+    notifications: [
+      {
+        id: "demo_notification_review",
+        householdId: DEMO_HOUSEHOLD_ID,
+        kind: "scheduled_review",
+        severity: "info",
+        title: "Portfolio review is due",
+        body: "Open the dashboard, unlock sensitive values, and clear the current review alerts.",
+        actionLabel: "Open dashboard",
+        sourceType: "household",
+        sourceId: DEMO_HOUSEHOLD_ID,
+        dueAt: "2026-06-15T02:00:00.000Z",
+        channels: ["in_app", "email"],
+        metadata: { email: DEMO_IDENTITY_USER.email },
+        status: "unread",
+        createdAt: "2026-06-15T02:00:00.000Z",
+        readAt: null,
+        emailedAt: null,
+      },
+      {
+        id: "demo_notification_p3",
+        householdId: DEMO_HOUSEHOLD_ID,
+        kind: "p3_guardrail",
+        severity: "critical",
+        title: "P3 cap review needed",
+        body: "TFEX speculation sleeve pushes P3 above its 10% target.",
+        actionLabel: "Review P3 cap",
+        sourceType: "holding",
+        sourceId: "demo_tfex_speculation",
+        dueAt: "2026-06-15T02:00:00.000Z",
+        channels: ["in_app"],
+        metadata: { assetLabel: "TFEX speculation sleeve" },
+        status: "unread",
+        createdAt: "2026-06-15T02:00:00.000Z",
+        readAt: null,
+        emailedAt: null,
       },
     ],
     priceDashboard: {

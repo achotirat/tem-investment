@@ -24,6 +24,13 @@ describe("CommandCenterApp demo login", () => {
     expect(screen.getByText("demo@example.com")).toBeInTheDocument();
     expect(screen.getAllByText("BTC cold storage")).toHaveLength(2);
     expect(screen.getByText("Price refresh")).toBeInTheDocument();
+    expect(screen.getByText("Review loop")).toBeInTheDocument();
+    expect(screen.getByText("Portfolio review is due")).toBeInTheDocument();
+    expect(screen.getByText("2 unread")).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Mark read" })[0]);
+
+    await waitFor(() => expect(screen.getByText("1 unread")).toBeInTheDocument());
 
     fireEvent.change(screen.getByLabelText("Master password"), {
       target: { value: "demo" },

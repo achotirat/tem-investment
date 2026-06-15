@@ -16,6 +16,7 @@ import type { HouseholdBootstrap } from "../server/household-service";
 import type { PortfolioReviewSnapshot } from "../shared/dashboard";
 import type { DecisionLogInput, DecisionLogSummary } from "../shared/discipline";
 import type { AddHoldingInput, HoldingSummary } from "../shared/holdings";
+import type { NotificationSummary } from "../shared/notifications";
 import type {
   MarketPriceSnapshot,
   PriceSyncSummary,
@@ -29,6 +30,7 @@ import { DecisionLogPanel } from "./decisions/DecisionLogPanel";
 import { LogHoldingDecisionPanel } from "./decisions/LogHoldingDecisionPanel";
 import { AddHoldingPanel } from "./holdings/AddHoldingPanel";
 import { HoldingsList } from "./holdings/HoldingsList";
+import { NotificationCenterPanel } from "./notifications/NotificationCenterPanel";
 import { PriceRefreshPanel } from "./pricing/PriceRefreshPanel";
 import { calculatePortfolioReview } from "./pricing/portfolio-valuations";
 import { buildRulesBasedRecommendations } from "./recommendations/rules-recommendations";
@@ -42,9 +44,11 @@ type DashboardShellProps = HouseholdBootstrap & {
   prices?: MarketPriceSnapshot[];
   staleWarnings?: ValuationFreshnessWarning[];
   lastPriceSync?: PriceSyncSummary | null;
+  notifications?: NotificationSummary[];
   refreshingPrices?: boolean;
   onUnlock?: (masterPassword: string) => Promise<DerivedMasterKey>;
   onRefreshPrices?: () => Promise<void> | void;
+  onMarkNotificationRead?: (notificationId: string) => Promise<void> | void;
 };
 
 export function DashboardShell({
@@ -59,9 +63,11 @@ export function DashboardShell({
   prices = [],
   staleWarnings = [],
   lastPriceSync = null,
+  notifications = [],
   refreshingPrices = false,
   onUnlock,
   onRefreshPrices = async () => {},
+  onMarkNotificationRead,
 }: DashboardShellProps) {
   const [sessionKey, setSessionKey] = useState<CryptoKey | null>(null);
   const [localHoldings, setLocalHoldings] = useState<HoldingSummary[]>(holdings ?? []);
@@ -252,6 +258,11 @@ export function DashboardShell({
           <PortfolioReviewPanel review={portfolioReview} />
 
           <RulesRecommendationPanel recommendations={recommendations} />
+
+          <NotificationCenterPanel
+            notifications={notifications}
+            onMarkRead={onMarkNotificationRead}
+          />
 
           <PriceRefreshPanel
             lastSync={lastPriceSync}

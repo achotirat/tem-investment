@@ -16,6 +16,7 @@ describe("AddHoldingPanel", () => {
 
     expect(screen.getByRole("button", { name: "Save holding" })).toBeDisabled();
     expect(screen.getByText("Unlock sensitive data before adding holdings")).toBeInTheDocument();
+    expect(screen.queryByText("LockedLocked")).not.toBeInTheDocument();
   });
 
   it("submits encrypted holding data when ownership totals 100 percent", async () => {
