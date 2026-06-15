@@ -811,6 +811,77 @@ button:disabled {
   background: var(--red);
 }
 
+.ai-review-body,
+.ai-scope-list,
+.ai-result-list {
+  display: grid;
+  gap: 10px;
+}
+
+.ai-scope-list {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.ai-scope-list span {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+  padding: 8px 10px;
+  color: var(--muted-ink);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ai-recommendation-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 10px 12px;
+}
+
+.ai-recommendation-row.critical {
+  border-color: rgba(180, 59, 46, 0.45);
+  background: var(--red-soft);
+}
+
+.ai-recommendation-row.warning {
+  border-color: rgba(184, 121, 22, 0.45);
+  background: var(--amber-soft);
+}
+
+.ai-recommendation-row strong,
+.ai-recommendation-row small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.ai-recommendation-row small {
+  margin-top: 3px;
+  color: var(--muted-ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.ai-actions .secondary-button {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
 .empty-state.compact {
   min-height: 64px;
   gap: 8px;
@@ -872,11 +943,17 @@ button:disabled {
 
   .holding-form-grid,
   .exposure-grid,
+  .ai-scope-list,
   .holdings-row,
   .decision-row,
   .recommendation-row,
-  .notification-row {
+  .notification-row,
+  .ai-recommendation-row {
     grid-template-columns: 1fr;
+  }
+
+  .ai-actions {
+    justify-content: flex-start;
   }
 
   .holdings-head {

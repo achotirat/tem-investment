@@ -1,6 +1,7 @@
 "use client";
 
 import type { HouseholdBootstrap } from "../server/household-service";
+import type { AIAnalysisRunSummary } from "../shared/ai-analysis";
 import type { DecisionLogSummary } from "../shared/discipline";
 import type { HoldingSummary } from "../shared/holdings";
 import type { NotificationSummary } from "../shared/notifications";
@@ -12,6 +13,7 @@ export type DemoWorkspace = {
   holdings: HoldingSummary[];
   decisions: DecisionLogSummary[];
   notifications: NotificationSummary[];
+  aiAnalysisRuns: AIAnalysisRunSummary[];
   priceDashboard: PriceDashboardPayload;
 };
 
@@ -181,6 +183,7 @@ export async function createDemoWorkspace(): Promise<DemoWorkspace> {
         emailedAt: null,
       },
     ],
+    aiAnalysisRuns: [],
     priceDashboard: {
       prices: [
         {

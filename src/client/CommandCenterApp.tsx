@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import { getUser, handleAuthCallback, login, logout, onAuthChange } from "@netlify/identity";
 
 import type { HouseholdBootstrap } from "../server/household-service";
+import type {
+  AIAnalysisRequest,
+  AIAnalysisRunSummary,
+  AIRecommendationStatus,
+} from "../shared/ai-analysis";
 import type { DecisionLogInput, DecisionLogSummary } from "../shared/discipline";
 import type { AddHoldingInput, HoldingSummary } from "../shared/holdings";
 import type { NotificationSummary } from "../shared/notifications";
@@ -47,6 +52,7 @@ export function CommandCenterApp() {
   });
   const [refreshingPrices, setRefreshingPrices] = useState(false);
   const [notifications, setNotifications] = useState<NotificationSummary[]>([]);
+  const [aiAnalysisRuns, setAIAnalysisRuns] = useState<AIAnalysisRunSummary[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -95,6 +101,7 @@ export function CommandCenterApp() {
       setHoldings([]);
       setDecisions([]);
       setNotifications([]);
+      setAIAnalysisRuns([]);
       setPriceDashboard({ prices: [], staleWarnings: [], lastSync: null });
       return;
     }
@@ -129,6 +136,7 @@ export function CommandCenterApp() {
       setHoldings([]);
       setDecisions([]);
       setNotifications([]);
+      setAIAnalysisRuns([]);
       setPriceDashboard({ prices: [], staleWarnings: [], lastSync: null });
       return;
     }
@@ -139,12 +147,18 @@ export function CommandCenterApp() {
 
     async function loadHoldings() {
       try {
-        const [holdingsResponse, decisionsResponse, pricesResponse, notificationsResponse] =
-          await Promise.all([
+        const [
+          holdingsResponse,
+          decisionsResponse,
+          pricesResponse,
+          notificationsResponse,
+          aiAnalysisResponse,
+        ] = await Promise.all([
             fetch("/api/holdings"),
             fetch("/api/decisions"),
             fetch("/api/prices"),
             fetch("/api/notifications"),
+            fetch("/api/ai-analysis"),
           ]);
         if (!holdingsResponse.ok) {
           throw new Error(`Holdings load failed with ${holdingsResponse.status}`);
@@ -158,6 +172,9 @@ export function CommandCenterApp() {
         if (!notificationsResponse.ok) {
           throw new Error(`Notifications load failed with ${notificationsResponse.status}`);
         }
+        if (!aiAnalysisResponse.ok) {
+          throw new Error(`AI analysis load failed with ${aiAnalysisResponse.status}`);
+        }
         const holdingsPayload = (await holdingsResponse.json()) as { holdings: HoldingSummary[] };
         const decisionsPayload = (await decisionsResponse.json()) as {
           decisions: DecisionLogSummary[];
@@ -166,11 +183,15 @@ export function CommandCenterApp() {
         const notificationsPayload = (await notificationsResponse.json()) as {
           notifications: NotificationSummary[];
         };
+        const aiAnalysisPayload = (await aiAnalysisResponse.json()) as {
+          runs: AIAnalysisRunSummary[];
+        };
         if (active) {
           setHoldings(holdingsPayload.holdings);
           setDecisions(decisionsPayload.decisions);
           setPriceDashboard(pricesPayload);
           setNotifications(notificationsPayload.notifications);
+          setAIAnalysisRuns(aiAnalysisPayload.runs);
         }
       } catch (error) {
         if (active) setBootstrapError(messageForError(error));
@@ -213,6 +234,7 @@ export function CommandCenterApp() {
       setHoldings(demoWorkspace.holdings);
       setDecisions(demoWorkspace.decisions);
       setNotifications(demoWorkspace.notifications);
+      setAIAnalysisRuns(demoWorkspace.aiAnalysisRuns);
       setPriceDashboard(demoWorkspace.priceDashboard);
       setAuth({
         loading: false,
@@ -237,6 +259,7 @@ export function CommandCenterApp() {
     setHoldings([]);
     setDecisions([]);
     setNotifications([]);
+    setAIAnalysisRuns([]);
     setPriceDashboard({ prices: [], staleWarnings: [], lastSync: null });
   }
 
@@ -324,6 +347,148 @@ export function CommandCenterApp() {
     );
   }
 
+  async function handleRunAIAnalysis(request: AIAnalysisRequest): Promise<AIAnalysisRunSummary> {
+    if (demoMode && bootstrap && auth.user?.id) {
+      const createdAt = new Date().toISOString();
+      const sourceRecommendations =
+        request.recommendations.length > 0
+          ? request.recommendations
+          : [
+              {
+                id: "demo_ai_review",
+                severity: "info" as const,
+                category: "risk" as const,
+                title: "Portfolio review is ready",
+                detail: "No urgent rule-based warnings are open.",
+                actionLabel: "Record review decision",
+              },
+            ];
+      const run: AIAnalysisRunSummary = {
+        id: `demo_ai_run_${Date.now()}`,
+        householdId: bootstrap.household.id,
+        actorIdentityUserId: auth.user.id,
+        status: "completed",
+        provider: "dry_run",
+        model: "dry-run-rules",
+        consentScope: request.consentScope,
+        inputSummary: {
+          baseCurrency: request.review.baseCurrency,
+          secondaryCurrency: request.review.secondaryCurrency,
+          bucketCount: request.review.bucketAllocations.length,
+          exposureGroupCount: Object.values(request.review.exposures).reduce(
+            (total, groups) => total + groups.length,
+            0,
+          ),
+          recommendationCount: request.recommendations.length,
+          criticalRecommendationCount: request.recommendations.filter(
+            (recommendation) => recommendation.severity === "critical",
+          ).length,
+          warningRecommendationCount: request.recommendations.filter(
+            (recommendation) => recommendation.severity === "warning",
+          ).length,
+        },
+        createdAt,
+        completedAt: createdAt,
+        errorMessage: null,
+        recommendations: sourceRecommendations.slice(0, 3).map((recommendation, index) => ({
+          id: `demo_ai_recommendation_${Date.now()}_${index}`,
+          runId: `demo_ai_run_${Date.now()}`,
+          householdId: bootstrap.household.id,
+          severity: recommendation.severity,
+          category: recommendation.category,
+          title: `AI review: ${recommendation.title}`,
+          detail: `${recommendation.detail} Challenge the assumption, document the decision, and avoid taking action until the household review is complete.`,
+          actionLabel: recommendation.actionLabel,
+          sourceRecommendationId: recommendation.id,
+          status: "open",
+          createdAt,
+          resolvedAt: null,
+          resolutionActorIdentityUserId: null,
+          resolutionNote: null,
+        })),
+      };
+      const normalizedRun = {
+        ...run,
+        recommendations: run.recommendations.map((recommendation) => ({
+          ...recommendation,
+          runId: run.id,
+        })),
+      };
+      setAIAnalysisRuns((current) => [normalizedRun, ...current]);
+      return normalizedRun;
+    }
+
+    const response = await fetch("/api/ai-analysis", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI analysis failed with ${response.status}`);
+    }
+
+    const payload = (await response.json()) as { run: AIAnalysisRunSummary };
+    setAIAnalysisRuns((current) => [payload.run, ...current]);
+    return payload.run;
+  }
+
+  async function handleResolveAIRecommendation(input: {
+    recommendationId: string;
+    status: Exclude<AIRecommendationStatus, "open">;
+    note: string;
+  }) {
+    const resolvedAt = new Date().toISOString();
+
+    if (demoMode) {
+      setAIAnalysisRuns((current) =>
+        current.map((run) => ({
+          ...run,
+          recommendations: run.recommendations.map((recommendation) =>
+            recommendation.id === input.recommendationId
+              ? {
+                  ...recommendation,
+                  status: input.status,
+                  resolvedAt,
+                  resolutionActorIdentityUserId: auth.user?.id ?? null,
+                  resolutionNote: input.note,
+                }
+              : recommendation,
+          ),
+        })),
+      );
+      return;
+    }
+
+    const response = await fetch("/api/ai-analysis", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI recommendation update failed with ${response.status}`);
+    }
+
+    const payload = (await response.json()) as {
+      recommendation: AIAnalysisRunSummary["recommendations"][number];
+    };
+    setAIAnalysisRuns((current) =>
+      current.map((run) => ({
+        ...run,
+        recommendations: run.recommendations.map((recommendation) =>
+          recommendation.id === payload.recommendation.id
+            ? payload.recommendation
+            : recommendation,
+        ),
+      })),
+    );
+  }
+
   if (auth.loading) {
     return <div className="loading-screen">Checking login</div>;
   }
@@ -350,6 +515,7 @@ export function CommandCenterApp() {
   return (
     <DashboardShell
       {...bootstrap}
+      aiAnalysisRuns={aiAnalysisRuns}
       decisions={decisions}
       holdings={holdings}
       lastPriceSync={priceDashboard.lastSync}
@@ -357,7 +523,9 @@ export function CommandCenterApp() {
       onCreateHolding={demoMode ? undefined : handleCreateHolding}
       onMarkNotificationRead={handleMarkNotificationRead}
       onRefreshPrices={demoMode ? undefined : handleRefreshPrices}
+      onResolveAIRecommendation={handleResolveAIRecommendation}
       onLogout={handleLogout}
+      onRunAIAnalysis={handleRunAIAnalysis}
       onUnlock={demoMode ? unlockDemoWorkspace : undefined}
       notifications={notifications}
       prices={priceDashboard.prices}

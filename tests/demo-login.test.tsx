@@ -44,5 +44,17 @@ describe("CommandCenterApp demo login", () => {
     expect(screen.getByText("Concentration views")).toBeInTheDocument();
     expect(screen.getByText("Rules-based recommendations")).toBeInTheDocument();
     expect(await screen.findByText("P3 is above its speculation cap")).toBeInTheDocument();
+    expect(screen.getByText("AI review")).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByLabelText("I consent to sending category-level portfolio data for AI review."),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Analyze with AI" }));
+
+    expect(await screen.findByText("AI review: P3 is above its speculation cap")).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Approve" })[0]);
+
+    await waitFor(() => expect(screen.getByText("Approved")).toBeInTheDocument());
   });
 });
