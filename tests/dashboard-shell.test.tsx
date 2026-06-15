@@ -62,6 +62,8 @@ describe("DashboardShell", () => {
     expect(screen.getAllByText("Locked")).not.toHaveLength(0);
     expect(screen.getByText("Price refresh")).toBeInTheDocument();
     expect(screen.getByText("Valuations are fresh")).toBeInTheDocument();
+    expect(screen.getByText("Review loop")).toBeInTheDocument();
+    expect(screen.getByText("No review reminders")).toBeInTheDocument();
     expect(screen.getByText("P1 Store of Wealth")).toBeInTheDocument();
     expect(screen.getByText("60% target")).toBeInTheDocument();
     expect(screen.getByText("No holdings recorded yet")).toBeInTheDocument();
