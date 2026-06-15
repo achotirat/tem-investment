@@ -6,6 +6,7 @@ import { getUser, handleAuthCallback, login, logout, onAuthChange } from "@netli
 import type { HouseholdBootstrap } from "../server/household-service";
 import type { DecisionLogInput, DecisionLogSummary } from "../shared/discipline";
 import type { AddHoldingInput, HoldingSummary } from "../shared/holdings";
+import type { NotificationSummary } from "../shared/notifications";
 import type { PriceDashboardPayload } from "../shared/pricing";
 import { DashboardShell } from "./DashboardShell";
 import { LoginPanel } from "./LoginPanel";
@@ -45,6 +46,7 @@ export function CommandCenterApp() {
     lastSync: null,
   });
   const [refreshingPrices, setRefreshingPrices] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationSummary[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -92,6 +94,7 @@ export function CommandCenterApp() {
       setBootstrap(null);
       setHoldings([]);
       setDecisions([]);
+      setNotifications([]);
       setPriceDashboard({ prices: [], staleWarnings: [], lastSync: null });
       return;
     }
@@ -125,6 +128,7 @@ export function CommandCenterApp() {
     if (!bootstrap) {
       setHoldings([]);
       setDecisions([]);
+      setNotifications([]);
       setPriceDashboard({ prices: [], staleWarnings: [], lastSync: null });
       return;
     }
@@ -135,11 +139,13 @@ export function CommandCenterApp() {
 
     async function loadHoldings() {
       try {
-        const [holdingsResponse, decisionsResponse, pricesResponse] = await Promise.all([
-          fetch("/api/holdings"),
-          fetch("/api/decisions"),
-          fetch("/api/prices"),
-        ]);
+        const [holdingsResponse, decisionsResponse, pricesResponse, notificationsResponse] =
+          await Promise.all([
+            fetch("/api/holdings"),
+            fetch("/api/decisions"),
+            fetch("/api/prices"),
+            fetch("/api/notifications"),
+          ]);
         if (!holdingsResponse.ok) {
           throw new Error(`Holdings load failed with ${holdingsResponse.status}`);
         }
@@ -149,15 +155,22 @@ export function CommandCenterApp() {
         if (!pricesResponse.ok) {
           throw new Error(`Prices load failed with ${pricesResponse.status}`);
         }
+        if (!notificationsResponse.ok) {
+          throw new Error(`Notifications load failed with ${notificationsResponse.status}`);
+        }
         const holdingsPayload = (await holdingsResponse.json()) as { holdings: HoldingSummary[] };
         const decisionsPayload = (await decisionsResponse.json()) as {
           decisions: DecisionLogSummary[];
         };
         const pricesPayload = (await pricesResponse.json()) as PriceDashboardPayload;
+        const notificationsPayload = (await notificationsResponse.json()) as {
+          notifications: NotificationSummary[];
+        };
         if (active) {
           setHoldings(holdingsPayload.holdings);
           setDecisions(decisionsPayload.decisions);
           setPriceDashboard(pricesPayload);
+          setNotifications(notificationsPayload.notifications);
         }
       } catch (error) {
         if (active) setBootstrapError(messageForError(error));
@@ -199,6 +212,7 @@ export function CommandCenterApp() {
       setBootstrap(demoWorkspace.bootstrap);
       setHoldings(demoWorkspace.holdings);
       setDecisions(demoWorkspace.decisions);
+      setNotifications(demoWorkspace.notifications);
       setPriceDashboard(demoWorkspace.priceDashboard);
       setAuth({
         loading: false,
@@ -222,6 +236,7 @@ export function CommandCenterApp() {
     setBootstrap(null);
     setHoldings([]);
     setDecisions([]);
+    setNotifications([]);
     setPriceDashboard({ prices: [], staleWarnings: [], lastSync: null });
   }
 
@@ -275,6 +290,40 @@ export function CommandCenterApp() {
     }
   }
 
+  async function handleMarkNotificationRead(notificationId: string) {
+    const readAt = new Date().toISOString();
+
+    if (demoMode) {
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.id === notificationId
+            ? { ...notification, status: "read", readAt }
+            : notification,
+        ),
+      );
+      return;
+    }
+
+    const response = await fetch("/api/notifications", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ notificationId }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Notification update failed with ${response.status}`);
+    }
+
+    const payload = (await response.json()) as { notification: NotificationSummary };
+    setNotifications((current) =>
+      current.map((notification) =>
+        notification.id === payload.notification.id ? payload.notification : notification,
+      ),
+    );
+  }
+
   if (auth.loading) {
     return <div className="loading-screen">Checking login</div>;
   }
@@ -306,9 +355,11 @@ export function CommandCenterApp() {
       lastPriceSync={priceDashboard.lastSync}
       onCreateDecision={demoMode ? undefined : handleCreateDecision}
       onCreateHolding={demoMode ? undefined : handleCreateHolding}
+      onMarkNotificationRead={handleMarkNotificationRead}
       onRefreshPrices={demoMode ? undefined : handleRefreshPrices}
       onLogout={handleLogout}
       onUnlock={demoMode ? unlockDemoWorkspace : undefined}
+      notifications={notifications}
       prices={priceDashboard.prices}
       refreshingPrices={refreshingPrices}
       staleWarnings={priceDashboard.staleWarnings}

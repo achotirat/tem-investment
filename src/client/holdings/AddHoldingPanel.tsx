@@ -165,7 +165,7 @@ export function AddHoldingPanel({
           Add holding
         </div>
         <span className={`pill ${locked ? "" : "secure"}`}>
-          {locked ? "Locked" : <ShieldCheck aria-hidden="true" size={15} />}
+          {locked ? null : <ShieldCheck aria-hidden="true" size={15} />}
           {locked ? "Locked" : "Unlocked"}
         </span>
       </div>
