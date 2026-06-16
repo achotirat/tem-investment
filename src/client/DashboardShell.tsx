@@ -20,6 +20,7 @@ import type {
 } from "../shared/ai-analysis";
 import type { PortfolioReviewSnapshot } from "../shared/dashboard";
 import type { DecisionLogInput, DecisionLogSummary } from "../shared/discipline";
+import type { ExportBackupMetadata } from "../shared/export-backup";
 import type { AddHoldingInput, HoldingSummary } from "../shared/holdings";
 import type { NotificationSummary } from "../shared/notifications";
 import type {
@@ -29,6 +30,7 @@ import type {
 } from "../shared/pricing";
 import { SecurityPanel } from "./SecurityPanel";
 import { AIReviewPanel } from "./ai/AIReviewPanel";
+import { ExportBackupPanel } from "./backup/ExportBackupPanel";
 import type { DerivedMasterKey } from "./crypto/portfolio-crypto";
 import { PortfolioReviewPanel } from "./dashboard/PortfolioReviewPanel";
 import { RulesRecommendationPanel } from "./dashboard/RulesRecommendationPanel";
@@ -52,6 +54,7 @@ type DashboardShellProps = HouseholdBootstrap & {
   lastPriceSync?: PriceSyncSummary | null;
   notifications?: NotificationSummary[];
   aiAnalysisRuns?: AIAnalysisRunSummary[];
+  exportBackups?: ExportBackupMetadata[];
   refreshingPrices?: boolean;
   onUnlock?: (masterPassword: string) => Promise<DerivedMasterKey>;
   onRefreshPrices?: () => Promise<void> | void;
@@ -62,6 +65,7 @@ type DashboardShellProps = HouseholdBootstrap & {
     status: Exclude<AIRecommendationStatus, "open">;
     note: string;
   }) => Promise<void> | void;
+  onCreateExportBackup?: (key: CryptoKey) => Promise<void> | void;
 };
 
 export function DashboardShell({
@@ -78,12 +82,14 @@ export function DashboardShell({
   lastPriceSync = null,
   notifications = [],
   aiAnalysisRuns = [],
+  exportBackups = [],
   refreshingPrices = false,
   onUnlock,
   onRefreshPrices = async () => {},
   onMarkNotificationRead,
   onRunAIAnalysis,
   onResolveAIRecommendation,
+  onCreateExportBackup,
 }: DashboardShellProps) {
   const [sessionKey, setSessionKey] = useState<CryptoKey | null>(null);
   const [localHoldings, setLocalHoldings] = useState<HoldingSummary[]>(holdings ?? []);
@@ -287,6 +293,14 @@ export function DashboardShell({
             recommendations={recommendations}
             review={portfolioReview}
             unlocked={sessionKey !== null}
+          />
+
+          <ExportBackupPanel
+            backups={exportBackups}
+            disabled={sessionKey === null || !onCreateExportBackup}
+            onCreateBackup={() => {
+              if (sessionKey && onCreateExportBackup) return onCreateExportBackup(sessionKey);
+            }}
           />
 
           <PriceRefreshPanel

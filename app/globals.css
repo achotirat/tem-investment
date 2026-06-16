@@ -664,7 +664,8 @@ button:disabled {
 
 .review-list,
 .recommendation-list,
-.notification-list {
+.notification-list,
+.backup-list {
   display: grid;
   gap: 10px;
 }
@@ -811,6 +812,29 @@ button:disabled {
   background: var(--red);
 }
 
+.backup-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 10px 12px;
+}
+
+.backup-row strong,
+.backup-row small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.backup-row small {
+  color: var(--muted-ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .ai-review-body,
 .ai-scope-list,
 .ai-result-list {
@@ -948,6 +972,7 @@ button:disabled {
   .decision-row,
   .recommendation-row,
   .notification-row,
+  .backup-row,
   .ai-recommendation-row {
     grid-template-columns: 1fr;
   }

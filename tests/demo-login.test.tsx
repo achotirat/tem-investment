@@ -45,6 +45,12 @@ describe("CommandCenterApp demo login", () => {
     expect(screen.getByText("Rules-based recommendations")).toBeInTheDocument();
     expect(await screen.findByText("P3 is above its speculation cap")).toBeInTheDocument();
     expect(screen.getByText("AI review")).toBeInTheDocument();
+    expect(screen.getByText("Export and backup")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create encrypted backup" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Create encrypted backup" }));
+
+    await waitFor(() => expect(screen.getByText("1 backups")).toBeInTheDocument());
 
     fireEvent.click(
       screen.getByLabelText("I consent to sending category-level portfolio data for AI review."),

@@ -10,11 +10,16 @@ import type {
   AIRecommendationStatus,
 } from "../shared/ai-analysis";
 import type { DecisionLogInput, DecisionLogSummary } from "../shared/discipline";
+import type { ExportBackupMetadata } from "../shared/export-backup";
 import type { AddHoldingInput, HoldingSummary } from "../shared/holdings";
 import type { NotificationSummary } from "../shared/notifications";
 import type { PriceDashboardPayload } from "../shared/pricing";
 import { DashboardShell } from "./DashboardShell";
 import { LoginPanel } from "./LoginPanel";
+import {
+  buildExportBackupPackage,
+  encryptExportBackupPackage,
+} from "./backup/export-backup-crypto";
 import {
   DEMO_IDENTITY_USER,
   createDemoWorkspace,
@@ -53,6 +58,7 @@ export function CommandCenterApp() {
   const [refreshingPrices, setRefreshingPrices] = useState(false);
   const [notifications, setNotifications] = useState<NotificationSummary[]>([]);
   const [aiAnalysisRuns, setAIAnalysisRuns] = useState<AIAnalysisRunSummary[]>([]);
+  const [exportBackups, setExportBackups] = useState<ExportBackupMetadata[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -102,6 +108,7 @@ export function CommandCenterApp() {
       setDecisions([]);
       setNotifications([]);
       setAIAnalysisRuns([]);
+      setExportBackups([]);
       setPriceDashboard({ prices: [], staleWarnings: [], lastSync: null });
       return;
     }
@@ -137,6 +144,7 @@ export function CommandCenterApp() {
       setDecisions([]);
       setNotifications([]);
       setAIAnalysisRuns([]);
+      setExportBackups([]);
       setPriceDashboard({ prices: [], staleWarnings: [], lastSync: null });
       return;
     }
@@ -153,12 +161,14 @@ export function CommandCenterApp() {
           pricesResponse,
           notificationsResponse,
           aiAnalysisResponse,
+          exportBackupsResponse,
         ] = await Promise.all([
             fetch("/api/holdings"),
             fetch("/api/decisions"),
             fetch("/api/prices"),
             fetch("/api/notifications"),
             fetch("/api/ai-analysis"),
+            fetch("/api/export-backup"),
           ]);
         if (!holdingsResponse.ok) {
           throw new Error(`Holdings load failed with ${holdingsResponse.status}`);
@@ -175,6 +185,9 @@ export function CommandCenterApp() {
         if (!aiAnalysisResponse.ok) {
           throw new Error(`AI analysis load failed with ${aiAnalysisResponse.status}`);
         }
+        if (!exportBackupsResponse.ok) {
+          throw new Error(`Export backup load failed with ${exportBackupsResponse.status}`);
+        }
         const holdingsPayload = (await holdingsResponse.json()) as { holdings: HoldingSummary[] };
         const decisionsPayload = (await decisionsResponse.json()) as {
           decisions: DecisionLogSummary[];
@@ -186,12 +199,16 @@ export function CommandCenterApp() {
         const aiAnalysisPayload = (await aiAnalysisResponse.json()) as {
           runs: AIAnalysisRunSummary[];
         };
+        const exportBackupsPayload = (await exportBackupsResponse.json()) as {
+          backups: ExportBackupMetadata[];
+        };
         if (active) {
           setHoldings(holdingsPayload.holdings);
           setDecisions(decisionsPayload.decisions);
           setPriceDashboard(pricesPayload);
           setNotifications(notificationsPayload.notifications);
           setAIAnalysisRuns(aiAnalysisPayload.runs);
+          setExportBackups(exportBackupsPayload.backups);
         }
       } catch (error) {
         if (active) setBootstrapError(messageForError(error));
@@ -235,6 +252,7 @@ export function CommandCenterApp() {
       setDecisions(demoWorkspace.decisions);
       setNotifications(demoWorkspace.notifications);
       setAIAnalysisRuns(demoWorkspace.aiAnalysisRuns);
+      setExportBackups(demoWorkspace.exportBackups);
       setPriceDashboard(demoWorkspace.priceDashboard);
       setAuth({
         loading: false,
@@ -260,6 +278,7 @@ export function CommandCenterApp() {
     setDecisions([]);
     setNotifications([]);
     setAIAnalysisRuns([]);
+    setExportBackups([]);
     setPriceDashboard({ prices: [], staleWarnings: [], lastSync: null });
   }
 
@@ -489,6 +508,51 @@ export function CommandCenterApp() {
     );
   }
 
+  async function handleCreateExportBackup(key: CryptoKey) {
+    if (!bootstrap) return;
+
+    const createdAt = new Date().toISOString();
+    const backupPackage = buildExportBackupPackage({
+      bootstrap,
+      holdings,
+      decisions,
+      priceDashboard,
+      notifications,
+      aiAnalysisRuns,
+      createdAt,
+    });
+    const encrypted = await encryptExportBackupPackage(backupPackage, key);
+
+    if (demoMode) {
+      const backup: ExportBackupMetadata = {
+        id: `backup_${createdAt.replace(/[:.]/g, "-")}`,
+        householdId: bootstrap.household.id,
+        createdAt,
+        format: encrypted.format,
+        version: encrypted.version,
+        byteLength: JSON.stringify(encrypted).length,
+        checksumSha256: encrypted.checksumSha256,
+      };
+      setExportBackups((current) => [backup, ...current]);
+      return;
+    }
+
+    const response = await fetch("/api/export-backup", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(encrypted),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Export backup failed with ${response.status}`);
+    }
+
+    const payload = (await response.json()) as { backup: ExportBackupMetadata };
+    setExportBackups((current) => [payload.backup, ...current]);
+  }
+
   if (auth.loading) {
     return <div className="loading-screen">Checking login</div>;
   }
@@ -517,9 +581,11 @@ export function CommandCenterApp() {
       {...bootstrap}
       aiAnalysisRuns={aiAnalysisRuns}
       decisions={decisions}
+      exportBackups={exportBackups}
       holdings={holdings}
       lastPriceSync={priceDashboard.lastSync}
       onCreateDecision={demoMode ? undefined : handleCreateDecision}
+      onCreateExportBackup={handleCreateExportBackup}
       onCreateHolding={demoMode ? undefined : handleCreateHolding}
       onMarkNotificationRead={handleMarkNotificationRead}
       onRefreshPrices={demoMode ? undefined : handleRefreshPrices}

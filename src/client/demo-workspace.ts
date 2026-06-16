@@ -3,6 +3,7 @@
 import type { HouseholdBootstrap } from "../server/household-service";
 import type { AIAnalysisRunSummary } from "../shared/ai-analysis";
 import type { DecisionLogSummary } from "../shared/discipline";
+import type { ExportBackupMetadata } from "../shared/export-backup";
 import type { HoldingSummary } from "../shared/holdings";
 import type { NotificationSummary } from "../shared/notifications";
 import type { PriceDashboardPayload } from "../shared/pricing";
@@ -14,6 +15,7 @@ export type DemoWorkspace = {
   decisions: DecisionLogSummary[];
   notifications: NotificationSummary[];
   aiAnalysisRuns: AIAnalysisRunSummary[];
+  exportBackups: ExportBackupMetadata[];
   priceDashboard: PriceDashboardPayload;
 };
 
@@ -184,6 +186,7 @@ export async function createDemoWorkspace(): Promise<DemoWorkspace> {
       },
     ],
     aiAnalysisRuns: [],
+    exportBackups: [],
     priceDashboard: {
       prices: [
         {

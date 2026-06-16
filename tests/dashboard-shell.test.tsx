@@ -66,6 +66,8 @@ describe("DashboardShell", () => {
     expect(screen.getByText("No review reminders")).toBeInTheDocument();
     expect(screen.getByText("AI review")).toBeInTheDocument();
     expect(screen.getByText("Unlock sensitive data to analyze")).toBeInTheDocument();
+    expect(screen.getByText("Export and backup")).toBeInTheDocument();
+    expect(screen.getByText("Unlock sensitive data before creating an encrypted backup")).toBeInTheDocument();
     expect(screen.getByText("P1 Store of Wealth")).toBeInTheDocument();
     expect(screen.getByText("60% target")).toBeInTheDocument();
     expect(screen.getByText("No holdings recorded yet")).toBeInTheDocument();
