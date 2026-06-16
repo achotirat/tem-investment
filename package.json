@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@netlify/blobs": "^10.7.9",
     "@netlify/database": "latest",
     "@netlify/functions": "latest",
     "@netlify/identity": "latest",
