@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getUser, handleAuthCallback, login, logout, onAuthChange } from "@netlify/identity";
+import { acceptInvite, getUser, handleAuthCallback, login, logout, onAuthChange } from "@netlify/identity";
 
 import type { HouseholdBootstrap } from "../server/household-service";
 import type {
@@ -38,6 +38,10 @@ type AuthState = {
   error: string | null;
 };
 
+type PendingInvite = {
+  token: string;
+};
+
 export function CommandCenterApp() {
   const [auth, setAuth] = useState<AuthState>({
     loading: true,
@@ -45,6 +49,7 @@ export function CommandCenterApp() {
     user: null,
     error: null,
   });
+  const [pendingInvite, setPendingInvite] = useState<PendingInvite | null>(null);
   const [bootstrap, setBootstrap] = useState<HouseholdBootstrap | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [demoMode, setDemoMode] = useState(false);
@@ -65,9 +70,23 @@ export function CommandCenterApp() {
 
     async function hydrateSession() {
       try {
-        await handleAuthCallback();
+        const callback = await handleAuthCallback();
+        if (callback?.type === "invite" && callback.token) {
+          if (active) {
+            setPendingInvite({ token: callback.token });
+            setAuth((current) => ({
+              ...current,
+              loading: false,
+              user: null,
+              error: null,
+            }));
+          }
+          return;
+        }
+
         const currentUser = (await getUser()) as AppIdentityUser | null;
         if (active) {
+          setPendingInvite(null);
           setAuth((current) => ({
             ...current,
             loading: false,
@@ -224,9 +243,41 @@ export function CommandCenterApp() {
 
   async function handleLogin(credentials: { email: string; password: string }) {
     setDemoMode(false);
+    setPendingInvite(null);
     setAuth((current) => ({ ...current, loggingIn: true, error: null }));
     try {
       const currentUser = (await login(credentials.email, credentials.password)) as AppIdentityUser;
+      setAuth((current) => ({
+        ...current,
+        loggingIn: false,
+        user: currentUser,
+        error: null,
+      }));
+    } catch (error) {
+      setAuth((current) => ({
+        ...current,
+        loggingIn: false,
+        error: messageForError(error),
+      }));
+    }
+  }
+
+  async function handleAcceptInvite(input: { password: string; confirmPassword: string }) {
+    if (!pendingInvite) return;
+
+    if (input.password !== input.confirmPassword) {
+      setAuth((current) => ({
+        ...current,
+        error: "Passwords must match.",
+      }));
+      return;
+    }
+
+    setDemoMode(false);
+    setAuth((current) => ({ ...current, loggingIn: true, error: null }));
+    try {
+      const currentUser = (await acceptInvite(pendingInvite.token, input.password)) as AppIdentityUser;
+      setPendingInvite(null);
       setAuth((current) => ({
         ...current,
         loggingIn: false,
@@ -562,6 +613,8 @@ export function CommandCenterApp() {
       <LoginPanel
         error={auth.error}
         loading={auth.loggingIn}
+        invitePending={Boolean(pendingInvite)}
+        onAcceptInvite={handleAcceptInvite}
         onDemoLogin={handleDemoLogin}
         onSubmit={handleLogin}
       />
