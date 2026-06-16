@@ -19,4 +19,15 @@ describe("holdings migration", () => {
     expect(migration).toContain("encrypted_value JSONB NOT NULL");
     expect(migration).not.toMatch(/\bquantity\b NUMERIC|\bcost_basis\b NUMERIC|\bcurrent_value\b NUMERIC/i);
   });
+
+  it("uses one RAISE placeholder for the split total", () => {
+    const raiseStatement = migration.match(/RAISE EXCEPTION '([^']*)', split_total;/);
+
+    expect(raiseStatement).not.toBeNull();
+
+    const [, message] = raiseStatement ?? [];
+    const placeholders = message.match(/(?<!%)%(?!%)/g) ?? [];
+
+    expect(placeholders).toHaveLength(1);
+  });
 });

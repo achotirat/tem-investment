@@ -85,7 +85,7 @@ BEGIN
   WHERE holding_id = target_holding_id;
 
   IF split_total <> 100 THEN
-    RAISE EXCEPTION 'Holding ownership splits must total 100%%. Current total is %%', split_total;
+    RAISE EXCEPTION 'Holding ownership splits must total 100%%. Current total is %', split_total;
   END IF;
 
   RETURN NULL;
